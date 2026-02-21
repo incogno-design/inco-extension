@@ -2,7 +2,7 @@
   "name": "inco",
   "displayName": "Inco — Invisible Constraints",
   "description": "VSCode extension for Inco, a compile-time assertion engine for Go. Provides syntax highlighting, diagnostics, commands, and snippets for @inco: directives.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "imnive-design",
   "license": "MIT",
   "repository": {

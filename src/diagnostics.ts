@@ -1,12 +1,11 @@
 import * as vscode from "vscode";
 
 /**
- * Regex matching @inco: directive comments.
+ * Regex matching @inco: directive action suffix.
  *
- * Groups:
- *   1 — the boolean expression
- *   2 — (optional) action name: panic|return|continue|break
- *   3 — (optional) action arguments
+ * Uses greedy .+ for expression (matches Go's actionRe behavior:
+ * backtracks to find the LAST top-level ", -action...").
+ * Action args also use greedy .+ to match Go's (.+) group.
  */
 
 const VALID_ACTIONS = new Set(["panic", "return", "continue", "break"]);

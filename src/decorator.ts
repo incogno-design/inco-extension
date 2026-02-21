@@ -16,7 +16,7 @@ export class IncoDecorator {
 
   // Matches the action suffix like `-panic("msg")` or `-return(0, err)` or `-continue`
   private readonly actionRe =
-    /\/\/\s*@inco:.+?,\s*(-(?:panic|return|continue|break)(?:\(.*?\))?)\s*$/gm;
+    /\/\/\s*@inco:.+,\s*(-(?:panic|return|continue|break)(?:\(.+\))?)\s*$/gm;
 
   constructor() {
     this.keywordType = vscode.window.createTextEditorDecorationType({
