@@ -11,7 +11,7 @@ export class IncoDecorator {
   private readonly keywordType: vscode.TextEditorDecorationType;
   private readonly actionType: vscode.TextEditorDecorationType;
 
-  // Matches `// @inco:` (the keyword part)
+  // Matches `// @inco:` — @inco: must be at start of comment body (after // + whitespace)
   private readonly keywordRe = /(\/\/\s*)(@inco:)/gm;
 
   // Matches the action suffix like `-panic("msg")` or `-return(0, err)` or `-continue`
@@ -59,7 +59,7 @@ export class IncoDecorator {
 
   private decorate(editor: vscode.TextEditor) {
     const doc = editor.document;
-    if (doc.languageId !== "go" && doc.languageId !== "inco-go") {
+    if (doc.languageId !== "go") {
       return;
     }
 

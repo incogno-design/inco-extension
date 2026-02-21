@@ -91,52 +91,36 @@
         "inco.autoGen": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically run 'inco gen' on save and when you stop typing in .inco.go files."
-        },
-        "inco.autoGenDelay": {
-          "type": "number",
-          "default": 1000,
-          "description": "Delay in milliseconds after you stop typing before auto-gen triggers."
+          "description": "Automatically run 'inco gen' on save in .inco.go files."
         },
         "inco.diagnostics.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable error diagnostics for invalid @inco: directives."
+        },
+        "inco.buildCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run 'go build -overlay' after gen to catch compile errors in @inco: expressions. Acts as a fallback when gopls doesn't fully support -overlay."
         }
       }
     },
-    "languages": [
-      {
-        "id": "inco-go",
-        "aliases": [
-          "Inco Go"
-        ],
-        "extensions": [
-          ".inco.go"
-        ],
-        "configuration": "./language-configuration.json"
-      }
-    ],
+    "languages": [],
     "grammars": [
-      {
-        "language": "inco-go",
-        "scopeName": "source.inco.go",
-        "path": "./syntaxes/inco-go.tmLanguage.json"
-      },
       {
         "scopeName": "comment.inco.injection",
         "path": "./syntaxes/inco-injection.tmLanguage.json",
         "injectTo": [
-          "source.go",
-          "source.inco.go"
+          "source.go"
         ]
       }
     ],
+    "configurationDefaults": {
+      "files.associations": {
+        "*.inco.go": "go"
+      }
+    },
     "snippets": [
-      {
-        "language": "inco-go",
-        "path": "./snippets/inco.json"
-      },
       {
         "language": "go",
         "path": "./snippets/inco.json"

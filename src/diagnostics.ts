@@ -73,28 +73,31 @@ export class IncoDirectiveDiagnostics {
   }
 
   private analyzeDocument(document: vscode.TextDocument) {
-    if (
-      document.languageId !== "go" &&
-      document.languageId !== "inco-go"
-    ) {
+    if (document.languageId !== "go") {
       return;
     }
 
     const diagnostics: vscode.Diagnostic[] = [];
 
+    // Matches lines where @inco: is at the START of the comment body
+    // (after // and optional whitespace), mirroring Go's ^@inco:\s+(.+)$
+    const directiveLineRe = /\/\/\s*(@inco:)(\s+.*)?$/;
+
     for (let i = 0; i < document.lineCount; i++) {
       const line = document.lineAt(i);
       const text = line.text;
 
-      // Look for @inco: pattern
-      const atIncoIndex = text.indexOf("@inco:");
-      if (atIncoIndex === -1) {
+      const lineMatch = directiveLineRe.exec(text);
+      if (!lineMatch) {
         continue;
       }
 
-      // Check it's inside a comment
+      const atIncoIndex = text.indexOf(lineMatch[1], text.indexOf("//"));
       const commentStart = text.lastIndexOf("//", atIncoIndex);
-      if (commentStart === -1) {
+
+      // Check that @inco: is the first thing in the comment body
+      const between = text.substring(commentStart + 2, atIncoIndex).trim();
+      if (between.length > 0) {
         continue;
       }
 

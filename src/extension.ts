@@ -7,8 +7,6 @@ import { registerPreviewCommand } from "./preview";
 import { IncoDecorator } from "./decorator";
 import { activateStatusBar } from "./statusbar";
 
-let genTimer: ReturnType<typeof setTimeout> | undefined;
-
 export function activate(context: vscode.ExtensionContext) {
   console.log("Inco extension activated");
 
@@ -32,7 +30,6 @@ export function activate(context: vscode.ExtensionContext) {
   // Hover provider — shows directive info on hover
   const hoverSelector: vscode.DocumentSelector = [
     { language: "go", scheme: "file" },
-    { language: "inco-go", scheme: "file" },
   ];
   context.subscriptions.push(
     vscode.languages.registerHoverProvider(hoverSelector, new IncoHoverProvider())
@@ -43,33 +40,11 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.languages.registerCodeLensProvider(hoverSelector, new IncoCodeLensProvider())
   );
 
-  // ── Auto-gen: on save + debounced idle ──────────────────────────
-  const scheduleGen = (doc: vscode.TextDocument) => {
-    if (!isIncoGoFile(doc)) {
-      return;
-    }
-    const config = vscode.workspace.getConfiguration("inco");
-    if (!config.get<boolean>("autoGen", true)) {
-      return;
-    }
-    const delay = config.get<number>("autoGenDelay", 1000);
-    if (genTimer) {
-      clearTimeout(genTimer);
-    }
-    genTimer = setTimeout(() => {
-      genTimer = undefined;
-      runGenSilent();
-    }, delay);
-  };
+  // ── Auto-gen: on save only ───────────────────────────────────
+  // inco gen reads from disk, so it only makes sense after save.
+  // Decorator & directive diagnostics already refresh in real-time
+  // from the in-memory buffer — no gen needed for that.
 
-  // Trigger on open
-  context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument((doc) => {
-      scheduleGen(doc);
-    })
-  );
-
-  // Trigger on save (immediate)
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
       if (!isIncoGoFile(doc)) {
@@ -79,28 +54,11 @@ export function activate(context: vscode.ExtensionContext) {
       if (!config.get<boolean>("autoGen", true)) {
         return;
       }
-      if (genTimer) {
-        clearTimeout(genTimer);
-        genTimer = undefined;
-      }
       runGenSilent();
-    })
-  );
-
-  // Trigger on stop typing (debounced)
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument((e) => {
-      scheduleGen(e.document);
     })
   );
 }
 
 function isIncoGoFile(doc: vscode.TextDocument): boolean {
   return doc.fileName.endsWith(".inco.go");
-}
-
-export function deactivate() {
-  if (genTimer) {
-    clearTimeout(genTimer);
-  }
 }

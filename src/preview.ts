@@ -26,10 +26,37 @@ class IncoShadowProvider implements vscode.TextDocumentContentProvider {
 }
 
 /**
- * Reads the overlay.json from .inco_cache/ in the workspace root.
+ * Finds the directory containing go.mod, starting from `dir` and also
+ * checking immediate subdirectories.
+ */
+function findGoModDir(dir: string): string | undefined {
+  if (fs.existsSync(path.join(dir, "go.mod"))) {
+    return dir;
+  }
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        const child = path.join(dir, entry.name);
+        if (fs.existsSync(path.join(child, "go.mod"))) {
+          return child;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+/**
+ * Reads the overlay.json from .inco_cache/ next to go.mod.
  */
 function loadOverlay(workspaceRoot: string): IncoOverlay | undefined {
-  const overlayPath = path.join(workspaceRoot, ".inco_cache", "overlay.json");
+  const goModDir = findGoModDir(workspaceRoot);
+  if (!goModDir) {
+    return undefined;
+  }
+  const overlayPath = path.join(goModDir, ".inco_cache", "overlay.json");
   if (!fs.existsSync(overlayPath)) {
     return undefined;
   }
@@ -136,12 +163,13 @@ export function registerPreviewCommand(context: vscode.ExtensionContext) {
       );
       const relPath = path.relative(workspaceRoot, sourceAbsPath);
 
-      // Open diff view: left = source, right = shadow (virtual, no Explorer impact)
+      // Open diff view: left = shadow (virtual, read-only), right = source (editable)
+      // vscode.diff treats the right side as "modified" which is editable & saveable.
       await vscode.commands.executeCommand(
         "vscode.diff",
-        sourceUri,
         shadowVirtualUri,
-        `${relPath}  ↔  Generated Guard`,
+        sourceUri,
+        `Generated Guard  ↔  ${relPath}`,
         { preview: true }
       );
     })
