@@ -12,6 +12,22 @@ function getIncoPath(): string {
 }
 
 /**
+ * Returns a copy of process.env with go/inco bin dirs on PATH.
+ * Handles the case where PATH is undefined in the extension host.
+ */
+function augmentedEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  const goPath = env.GOPATH || path.join(env.HOME || "", "go");
+  const goBin = path.join(goPath, "bin");
+  const localBin = "/usr/local/go/bin";
+  const currentPath = env.PATH || "/usr/bin:/bin:/usr/sbin:/sbin";
+  if (!currentPath.includes(goBin)) {
+    env.PATH = `${goBin}:${localBin}:${currentPath}`;
+  }
+  return env;
+}
+
+/**
  * Returns the workspace root directory, or undefined.
  */
 function getWorkspaceDir(): string | undefined {
@@ -39,6 +55,7 @@ function runIncoCommand(
     const proc = cp.spawn(bin, args, {
       cwd,
       shell: true,
+      env: augmentedEnv(),
     });
 
     if (!options?.silent) {
@@ -118,10 +135,31 @@ export function registerCommands(context: vscode.ExtensionContext) {
 
   // Expose a silent gen runner for auto-gen (no panel popup, no toast)
   incoChannel = channel;
+
+  // Manual build-check command for debugging
+  context.subscriptions.push(
+    vscode.commands.registerCommand("inco.checkBuild", async () => {
+      channel.show(true);
+      channel.appendLine("\n--- Manual Build Check ---");
+      log("[inco] manual checkBuild triggered");
+      try {
+        await checkBuildErrors();
+        channel.appendLine("--- Build Check Complete ---");
+      } catch (e) {
+        log(`[inco] checkBuild error: ${e}`);
+      }
+    })
+  );
 }
 
 let incoChannel: vscode.OutputChannel | undefined;
 let buildDiagnostics: vscode.DiagnosticCollection | undefined;
+
+/** Log to both console and the Inco output channel. */
+function log(msg: string): void {
+  console.log(msg);
+  incoChannel?.appendLine(msg);
+}
 
 /**
  * Runs `inco gen` silently — output goes to the channel but
@@ -135,16 +173,19 @@ let buildDiagnostics: vscode.DiagnosticCollection | undefined;
  *      that gopls might miss (or if gopls isn't installed).
  */
 export async function runGenSilent(): Promise<void> {
+  log("[inco] runGenSilent called");
   if (!incoChannel) {
+    log("[inco] runGenSilent: no channel, aborting");
     return;
   }
   try {
     const code = await runIncoCommand(incoChannel, ["gen"], { silent: true });
+    log(`[inco] inco gen exit code: ${code}`);
     if (code === 0) {
       await postGenSync();
     }
-  } catch {
-    // silently ignore
+  } catch (e) {
+    log(`[inco] runGenSilent error: ${e}`);
   }
 }
 
@@ -154,7 +195,12 @@ export async function runGenSilent(): Promise<void> {
  */
 async function postGenSync(): Promise<void> {
   // 1) gopls overlay — main provider (real-time / incremental)
-  await syncGoplsOverlay();
+  //    Wrapped in try/catch so a gopls error never blocks build-check.
+  try {
+    await syncGoplsOverlay();
+  } catch (e) {
+    log(`[inco] syncGoplsOverlay error (non-fatal): ${e}`);
+  }
   // 2) go build -overlay — fallback provider (compile-error catch-all)
   await checkBuildErrors();
 }
@@ -255,8 +301,15 @@ async function checkBuildErrors(): Promise<void> {
     // Clear directive-line cache so edited files are re-scanned
     _directiveLineCache.clear();
 
+    log(`[inco buildCheck] cwd=${goModDir} overlay=${overlayPath}`);
     const output = await runGoCheck(goModDir, overlayPath);
+    log(`[inco buildCheck] output: ${output || "(empty)"}`);
+
     const diags = parseGoErrors(output, wsDir);
+    log(`[inco buildCheck] parsed ${diags.size} file(s) with errors`);
+    for (const [fp, dd] of diags) {
+      log(`[inco buildCheck]   ${fp}: ${dd.length} diagnostic(s)`);
+    }
 
     // Clear old build diagnostics
     buildDiagnostics.clear();
@@ -265,8 +318,9 @@ async function checkBuildErrors(): Promise<void> {
     for (const [filePath, fileDiags] of diags) {
       buildDiagnostics.set(vscode.Uri.file(filePath), fileDiags);
     }
-  } catch {
-    // build check failed to run — ignore silently
+    log(`[inco buildCheck] diagnostics applied`);
+  } catch (e) {
+    log(`[inco buildCheck] ERROR: ${e}`);
   }
 }
 
@@ -305,7 +359,7 @@ function runGoCheck(cwd: string, overlayPath: string): Promise<string> {
     const proc = cp.spawn(
       "go",
       ["build", `-overlay=${overlayPath}`, "-gcflags=-e", "./..."],
-      { cwd, shell: true }
+      { cwd, shell: true, env: augmentedEnv() }
     );
 
     let output = "";

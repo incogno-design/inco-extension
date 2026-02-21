@@ -8,7 +8,8 @@ import { IncoDecorator } from "./decorator";
 import { activateStatusBar } from "./statusbar";
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("Inco extension activated");
+  console.log("[inco] ★ Extension activated");
+  vscode.window.showInformationMessage("Inco extension activated");
 
   // Register all inco commands (gen, build, test, run, audit, release, clean)
   registerCommands(context);
@@ -47,14 +48,19 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
+      console.log(`[inco] onDidSave: ${doc.fileName} isIncoGo=${isIncoGoFile(doc)}`);
       if (!isIncoGoFile(doc)) {
         return;
       }
       const config = vscode.workspace.getConfiguration("inco");
       if (!config.get<boolean>("autoGen", true)) {
+        console.log("[inco] autoGen disabled");
         return;
       }
-      runGenSilent();
+      console.log("[inco] calling runGenSilent");
+      runGenSilent().catch((e) => {
+        console.error("[inco] runGenSilent unhandled error:", e);
+      });
     })
   );
 }

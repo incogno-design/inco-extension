@@ -66,6 +66,10 @@
         "title": "Inco: Clean Cache"
       },
       {
+        "command": "inco.checkBuild",
+        "title": "Inco: Check Build Errors (Debug)"
+      },
+      {
         "command": "inco.preview",
         "title": "Inco: Preview Generated Guard",
         "icon": "$(open-preview)"
