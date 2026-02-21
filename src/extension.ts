@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { registerCommands } from "./commands";
+import { registerCommands, runGenSilent } from "./commands";
 import { IncoDirectiveDiagnostics } from "./diagnostics";
 import { IncoHoverProvider } from "./hover";
 import { IncoCodeLensProvider } from "./codelens";
@@ -58,7 +58,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
     genTimer = setTimeout(() => {
       genTimer = undefined;
-      vscode.commands.executeCommand("inco.gen");
+      runGenSilent();
     }, delay);
   };
 
@@ -83,7 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
         clearTimeout(genTimer);
         genTimer = undefined;
       }
-      vscode.commands.executeCommand("inco.gen");
+      runGenSilent();
     })
   );
 

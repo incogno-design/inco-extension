@@ -18,20 +18,23 @@ function getWorkspaceDir(): string | undefined {
 
 /**
  * Runs an inco CLI command and streams output to the Inco output channel.
+ * When silent=true, the output channel won't pop up (used for auto-gen).
  */
 function runIncoCommand(
   channel: vscode.OutputChannel,
   args: string[],
-  cwd?: string
+  options?: { cwd?: string; silent?: boolean }
 ): Promise<number> {
   return new Promise((resolve, reject) => {
     const bin = getIncoPath();
     const proc = cp.spawn(bin, args, {
-      cwd: cwd || getWorkspaceDir() || ".",
+      cwd: options?.cwd || getWorkspaceDir() || ".",
       shell: true,
     });
 
-    channel.show(true);
+    if (!options?.silent) {
+      channel.show(true);
+    }
     channel.appendLine(`> ${bin} ${args.join(" ")}`);
 
     proc.stdout?.on("data", (data: Buffer) => {
@@ -94,5 +97,25 @@ export function registerCommands(context: vscode.ExtensionContext) {
         }
       })
     );
+  }
+
+  // Expose a silent gen runner for auto-gen (no panel popup, no toast)
+  incoChannel = channel;
+}
+
+let incoChannel: vscode.OutputChannel | undefined;
+
+/**
+ * Runs `inco gen` silently — output goes to the channel but
+ * the panel won't pop up. Used by auto-gen on save/idle.
+ */
+export async function runGenSilent(): Promise<void> {
+  if (!incoChannel) {
+    return;
+  }
+  try {
+    await runIncoCommand(incoChannel, ["gen"], { silent: true });
+  } catch {
+    // silently ignore
   }
 }
