@@ -4,8 +4,7 @@ const DIRECTIVE_RE = /\/\/\s*@inco:\s+/;
 
 export class IncoCodeLensProvider implements vscode.CodeLensProvider {
   provideCodeLenses(
-    document: vscode.TextDocument,
-    _token: vscode.CancellationToken
+    document: vscode.TextDocument
   ): vscode.CodeLens[] {
     const lenses: vscode.CodeLens[] = [];
     let directiveCount = 0;

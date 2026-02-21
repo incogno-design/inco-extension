@@ -6,8 +6,7 @@ const DIRECTIVE_RE =
 export class IncoHoverProvider implements vscode.HoverProvider {
   provideHover(
     document: vscode.TextDocument,
-    position: vscode.Position,
-    _token: vscode.CancellationToken
+    position: vscode.Position
   ): vscode.ProviderResult<vscode.Hover> {
     const line = document.lineAt(position.line);
     const match = DIRECTIVE_RE.exec(line.text);

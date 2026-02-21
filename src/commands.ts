@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
-import * as path from "path";
 
 /**
  * Returns the configured inco executable path.
@@ -87,9 +86,10 @@ export function registerCommands(context: vscode.ExtensionContext) {
               `Inco: ${cmd.label} exited with code ${code}.`
             );
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
           vscode.window.showErrorMessage(
-            `Inco: ${cmd.label} failed — ${err.message}`
+            `Inco: ${cmd.label} failed — ${message}`
           );
         }
       })

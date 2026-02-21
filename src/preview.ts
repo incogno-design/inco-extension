@@ -10,6 +10,22 @@ interface IncoOverlay {
 }
 
 /**
+ * Virtual document provider for shadow files.
+ * Uses a custom URI scheme so the Explorer doesn't reveal .inco_cache.
+ */
+class IncoShadowProvider implements vscode.TextDocumentContentProvider {
+  provideTextDocumentContent(uri: vscode.Uri): string {
+    // The real file path is stored in the query parameter
+    const realPath = uri.query;
+    try {
+      return fs.readFileSync(realPath, "utf-8");
+    } catch {
+      return "// Inco: could not read shadow file";
+    }
+  }
+}
+
+/**
  * Reads the overlay.json from .inco_cache/ in the workspace root.
  */
 function loadOverlay(workspaceRoot: string): IncoOverlay | undefined {
@@ -57,6 +73,14 @@ function findShadowPath(
  * between the source .inco.go file and its generated shadow file.
  */
 export function registerPreviewCommand(context: vscode.ExtensionContext) {
+  // Register virtual document provider for shadow files
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(
+      "inco-shadow",
+      new IncoShadowProvider()
+    )
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand("inco.preview", async (uri?: vscode.Uri) => {
       // Determine the source file
@@ -106,14 +130,17 @@ export function registerPreviewCommand(context: vscode.ExtensionContext) {
         return;
       }
 
-      const shadowUri = vscode.Uri.file(shadowPath);
+      // Build a virtual URI for the shadow file so Explorer stays untouched
+      const shadowVirtualUri = vscode.Uri.parse(
+        `inco-shadow:${path.basename(shadowPath)}?${shadowPath}`
+      );
       const relPath = path.relative(workspaceRoot, sourceAbsPath);
 
-      // Open diff view: left = source, right = shadow (generated)
+      // Open diff view: left = source, right = shadow (virtual, no Explorer impact)
       await vscode.commands.executeCommand(
         "vscode.diff",
         sourceUri,
-        shadowUri,
+        shadowVirtualUri,
         `${relPath}  ↔  Generated Guard`,
         { preview: true }
       );

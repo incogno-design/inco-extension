@@ -5,6 +5,7 @@ import { IncoHoverProvider } from "./hover";
 import { IncoCodeLensProvider } from "./codelens";
 import { registerPreviewCommand } from "./preview";
 import { IncoDecorator } from "./decorator";
+import { activateStatusBar } from "./statusbar";
 
 let genTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -24,6 +25,9 @@ export function activate(context: vscode.ExtensionContext) {
   // Decorator — colored highlights for @inco: and actions
   const decorator = new IncoDecorator();
   decorator.activate(context);
+
+  // Status bar — shows inco/(if+inco) coverage percentage
+  activateStatusBar(context);
 
   // Hover provider — shows directive info on hover
   const hoverSelector: vscode.DocumentSelector = [

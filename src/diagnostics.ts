@@ -8,8 +8,6 @@ import * as vscode from "vscode";
  *   2 — (optional) action name: panic|return|continue|break
  *   3 — (optional) action arguments
  */
-const DIRECTIVE_RE =
-  /\/\/\s*@inco:\s+(.+?)(?:,\s*-(panic|return|continue|break)(?:\((.+?)\))?)?\s*$/;
 
 const VALID_ACTIONS = new Set(["panic", "return", "continue", "break"]);
 
