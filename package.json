@@ -1,0 +1,162 @@
+{
+  "name": "inco",
+  "displayName": "Inco — Invisible Constraints",
+  "description": "VSCode extension for Inco, a compile-time assertion engine for Go. Provides syntax highlighting, diagnostics, commands, and snippets for @inco: directives.",
+  "version": "0.0.1",
+  "publisher": "imnive-design",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imnive-design/inco-go"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets"
+  ],
+  "keywords": [
+    "go",
+    "golang",
+    "inco",
+    "contracts",
+    "assertions",
+    "compile-time"
+  ],
+  "icon": "images/icon.png",
+  "activationEvents": [
+    "workspaceContains:**/*.inco.go"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "inco.gen",
+        "title": "Inco: Generate Overlay",
+        "icon": "$(play)"
+      },
+      {
+        "command": "inco.build",
+        "title": "Inco: Build"
+      },
+      {
+        "command": "inco.test",
+        "title": "Inco: Test"
+      },
+      {
+        "command": "inco.run",
+        "title": "Inco: Run"
+      },
+      {
+        "command": "inco.audit",
+        "title": "Inco: Audit (Contract Coverage)"
+      },
+      {
+        "command": "inco.release",
+        "title": "Inco: Release (Bake Guards)"
+      },
+      {
+        "command": "inco.releaseClean",
+        "title": "Inco: Release Clean (Revert)"
+      },
+      {
+        "command": "inco.clean",
+        "title": "Inco: Clean Cache"
+      },
+      {
+        "command": "inco.preview",
+        "title": "Inco: Preview Generated Guard",
+        "icon": "$(open-preview)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "inco.preview",
+          "when": "resourceExtname == .go",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Inco",
+      "properties": {
+        "inco.executablePath": {
+          "type": "string",
+          "default": "inco",
+          "description": "Path to the inco binary. Defaults to 'inco' (found via PATH)."
+        },
+        "inco.autoGen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically run 'inco gen' on save and when you stop typing in .inco.go files."
+        },
+        "inco.autoGenDelay": {
+          "type": "number",
+          "default": 1000,
+          "description": "Delay in milliseconds after you stop typing before auto-gen triggers."
+        },
+        "inco.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable error diagnostics for invalid @inco: directives."
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "inco-go",
+        "aliases": [
+          "Inco Go"
+        ],
+        "extensions": [
+          ".inco.go"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "inco-go",
+        "scopeName": "source.inco.go",
+        "path": "./syntaxes/inco-go.tmLanguage.json"
+      },
+      {
+        "scopeName": "comment.inco.injection",
+        "path": "./syntaxes/inco-injection.tmLanguage.json",
+        "injectTo": [
+          "source.go",
+          "source.inco.go"
+        ]
+      }
+    ],
+    "snippets": [
+      {
+        "language": "inco-go",
+        "path": "./snippets/inco.json"
+      },
+      {
+        "language": "go",
+        "path": "./snippets/inco.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}

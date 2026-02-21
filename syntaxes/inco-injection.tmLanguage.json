@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Inco Injection",
+  "scopeName": "comment.inco.injection",
+  "injectionSelector": "L:source.go, L:source.inco.go",
+  "patterns": [
+    {
+      "name": "comment.line.double-slash.inco.directive",
+      "match": "(//\\s*)(@inco:)(\\s+)(.+?)(?:(,\\s*)(-(panic|return|continue|break))(\\((.+?)\\))?)?(\\s*)$",
+      "captures": {
+        "1": { "name": "punctuation.definition.comment.go" },
+        "2": { "name": "comment.line.double-slash.inco.keyword" },
+        "3": { "name": "comment.line.double-slash.go" },
+        "4": { "name": "comment.line.double-slash.go" },
+        "5": { "name": "comment.line.double-slash.go" },
+        "6": { "name": "comment.line.double-slash.inco.action" },
+        "7": { "name": "comment.line.double-slash.inco.action" },
+        "8": { "name": "comment.line.double-slash.go" },
+        "9": { "name": "comment.line.double-slash.go" }
+      }
+    }
+  ]
+}

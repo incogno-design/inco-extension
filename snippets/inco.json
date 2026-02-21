@@ -1,0 +1,52 @@
+{
+  "Inco: assert (panic default)": {
+    "prefix": "inco",
+    "body": "// @inco: ${1:expr}",
+    "description": "Inco directive with default panic action"
+  },
+  "Inco: assert panic": {
+    "prefix": "incopanic",
+    "body": "// @inco: ${1:expr}, -panic(\"${2:message}\")",
+    "description": "Inco directive with custom panic message"
+  },
+  "Inco: assert return": {
+    "prefix": "incoreturn",
+    "body": "// @inco: ${1:expr}, -return(${2:values})",
+    "description": "Inco directive with return action"
+  },
+  "Inco: assert continue": {
+    "prefix": "incocontinue",
+    "body": "// @inco: ${1:expr}, -continue",
+    "description": "Inco directive with continue action"
+  },
+  "Inco: assert break": {
+    "prefix": "incobreak",
+    "body": "// @inco: ${1:expr}, -break",
+    "description": "Inco directive with break action"
+  },
+  "Inco: nil check": {
+    "prefix": "inconil",
+    "body": "// @inco: ${1:ptr} != nil",
+    "description": "Inco nil pointer check"
+  },
+  "Inco: error check (inline)": {
+    "prefix": "incoerr",
+    "body": "_ = ${1:err} // @inco: ${1:err} == nil, -panic(${1:err})",
+    "description": "Inco inline error assertion"
+  },
+  "Inco: positive value": {
+    "prefix": "incopos",
+    "body": "// @inco: ${1:x} > 0, -panic(\"${1:x} must be positive\")",
+    "description": "Inco positive value assertion"
+  },
+  "Inco: bounds check": {
+    "prefix": "incobounds",
+    "body": "// @inco: ${1:i} < len(${2:slice})",
+    "description": "Inco bounds check assertion"
+  },
+  "Inco: non-empty string": {
+    "prefix": "incolen",
+    "body": "// @inco: len(${1:s}) > 0, -return(${2:zero, fmt.Errorf(\"empty\")})",
+    "description": "Inco non-empty string check"
+  }
+}
