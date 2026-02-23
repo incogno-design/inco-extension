@@ -8,7 +8,7 @@ import * as vscode from "vscode";
  * Action args also use greedy .+ to match Go's (.+) group.
  */
 
-const VALID_ACTIONS = new Set(["panic", "return", "continue", "break"]);
+const VALID_ACTIONS = new Set(["panic", "return", "continue", "break", "log"]);
 
 export class IncoDirectiveDiagnostics {
   private diagnosticCollection: vscode.DiagnosticCollection;

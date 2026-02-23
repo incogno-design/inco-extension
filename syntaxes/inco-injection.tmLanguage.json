@@ -6,7 +6,7 @@
   "patterns": [
     {
       "name": "comment.line.double-slash.inco.directive",
-      "match": "(//\\s*)(@inco:)(\\s+)(.+?)(?:(,\\s*)(-(panic|return|continue|break))(\\((.+?)\\))?)?(\\s*)$",
+      "match": "(//\\s*)(@inco:)(\\s+)(.+?)(?:(,\\s*)(-(panic|return|continue|break|log))(\\((.+?)\\))?)?(\\s*)$",
       "captures": {
         "1": { "name": "punctuation.definition.comment.go" },
         "2": { "name": "comment.line.double-slash.inco.keyword" },

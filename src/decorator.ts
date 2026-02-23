@@ -14,9 +14,9 @@ export class IncoDecorator {
   // Matches `// @inco:` — @inco: must be at start of comment body (after // + whitespace)
   private readonly keywordRe = /(\/\/\s*)(@inco:)/gm;
 
-  // Matches the action suffix like `-panic("msg")` or `-return(0, err)` or `-continue`
+  // Matches the action suffix like `-panic("msg")` or `-return(0, err)` or `-continue` or `-log("msg")`
   private readonly actionRe =
-    /\/\/\s*@inco:.+,\s*(-(?:panic|return|continue|break)(?:\(.+\))?)\s*$/gm;
+    /\/\/\s*@inco:.+,\s*(-(?:panic|return|continue|break|log)(?:\(.+\))?)\s*$/gm;
 
   constructor() {
     this.keywordType = vscode.window.createTextEditorDecorationType({

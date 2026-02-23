@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 
 const DIRECTIVE_RE =
-  /\/\/\s*@inco:\s+(.+?)(?:,\s*-(panic|return|continue|break)(?:\((.+)\))?)?\s*$/;
+  /\/\/\s*@inco:\s+(.+?)(?:,\s*-(panic|return|continue|break|log)(?:\((.+)\))?)?\s*$/;
 
 export class IncoHoverProvider implements vscode.HoverProvider {
   provideHover(
@@ -70,6 +70,12 @@ function generateGuardPreview(
 
     case "break":
       return `if ${negated} {\n    break\n}`;
+
+    case "log":
+      if (actionArgs) {
+        return `if ${negated} {\n    log.Printf(${actionArgs})\n}`;
+      }
+      return `if ${negated} {\n    log.Printf("inco violation: ${expr}")\n}`;
 
     default:
       return `if ${negated} {\n    panic("inco violation: ${expr}")\n}`;

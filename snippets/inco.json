@@ -24,6 +24,11 @@
     "body": "// @inco: ${1:expr}, -break",
     "description": "Inco directive with break action"
   },
+  "Inco: assert log": {
+    "prefix": "incolog",
+    "body": "// @inco: ${1:expr}, -log(\"${2:message}\")",
+    "description": "Inco directive with log action"
+  },
   "Inco: nil check": {
     "prefix": "inconil",
     "body": "// @inco: ${1:ptr} != nil",
