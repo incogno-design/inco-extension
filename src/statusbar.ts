@@ -23,7 +23,7 @@ export function activateStatusBar(context: vscode.ExtensionContext) {
   // Refresh after saving .inco.go files
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
-      if (doc.fileName.endsWith(".inco.go")) {
+      if (doc.fileName.endsWith(".inco.go") || doc.fileName.endsWith(".inco")) {
         scheduleRefresh();
       }
     })

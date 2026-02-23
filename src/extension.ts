@@ -31,6 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Hover provider — shows directive info on hover
   const hoverSelector: vscode.DocumentSelector = [
     { language: "go", scheme: "file" },
+    { language: "inco", scheme: "file" },
   ];
   context.subscriptions.push(
     vscode.languages.registerHoverProvider(hoverSelector, new IncoHoverProvider())
@@ -66,5 +67,5 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 function isIncoGoFile(doc: vscode.TextDocument): boolean {
-  return doc.fileName.endsWith(".inco.go");
+  return doc.fileName.endsWith(".inco.go") || doc.fileName.endsWith(".inco");
 }

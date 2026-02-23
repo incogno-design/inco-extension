@@ -417,7 +417,7 @@ function parseGoErrors(
     let sourceFile: string;
     let sourceLine: number;
 
-    if (absFile.endsWith(".inco.go")) {
+    if (absFile.endsWith(".inco.go") || absFile.endsWith(".inco")) {
       // Case A: //line worked — error points at source file directly
       sourceFile = absFile;
       // Snap to nearest @inco: directive in source

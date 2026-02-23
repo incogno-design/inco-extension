@@ -2,7 +2,7 @@
   "name": "inco",
   "displayName": "Inco — Invisible Constraints",
   "description": "VSCode extension for Inco, a compile-time assertion engine for Go. Provides syntax highlighting, diagnostics, commands, and snippets for @inco: directives.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "imnive-design",
   "license": "MIT",
   "repository": {
@@ -27,7 +27,8 @@
   ],
   "icon": "images/icon.png",
   "activationEvents": [
-    "workspaceContains:**/*.inco.go"
+    "workspaceContains:**/*.inco.go",
+    "workspaceContains:**/*.inco"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -79,7 +80,7 @@
       "editor/title": [
         {
           "command": "inco.preview",
-          "when": "resourceExtname == .go",
+          "when": "resourceExtname == .go || resourceExtname == .inco",
           "group": "navigation"
         }
       ]
@@ -106,27 +107,52 @@
           "type": "boolean",
           "default": true,
           "description": "Run 'go build -overlay' after gen to catch compile errors in @inco: expressions. Acts as a fallback when gopls doesn't fully support -overlay."
+        },
+        "inco.highlight.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable syntax highlighting for @inco: directives (keyword and action colors)."
         }
       }
     },
-    "languages": [],
+    "languages": [
+      {
+        "id": "inco",
+        "aliases": ["Inco", "inco"],
+        "extensions": [".inco"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
     "grammars": [
       {
         "scopeName": "comment.inco.injection",
         "path": "./syntaxes/inco-injection.tmLanguage.json",
         "injectTo": [
-          "source.go"
+          "source.go",
+          "source.inco"
         ]
+      },
+      {
+        "language": "inco",
+        "scopeName": "source.inco",
+        "path": "./syntaxes/inco-go.tmLanguage.json"
       }
     ],
     "configurationDefaults": {
       "files.associations": {
         "*.inco.go": "go"
+      },
+      "[inco]": {
+        "editor.defaultFormatter": null
       }
     },
     "snippets": [
       {
         "language": "go",
+        "path": "./snippets/inco.json"
+      },
+      {
+        "language": "inco",
         "path": "./snippets/inco.json"
       }
     ]

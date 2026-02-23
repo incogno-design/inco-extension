@@ -55,11 +55,31 @@ export class IncoDecorator {
         }
       })
     );
+
+    // Re-decorate all editors when the highlight setting changes
+    context.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("inco.highlight.enabled")) {
+          for (const editor of vscode.window.visibleTextEditors) {
+            this.decorate(editor);
+          }
+        }
+      })
+    );
   }
 
   private decorate(editor: vscode.TextEditor) {
     const doc = editor.document;
-    if (doc.languageId !== "go") {
+    if (doc.languageId !== "go" && doc.languageId !== "inco") {
+      return;
+    }
+
+    const enabled = vscode.workspace
+      .getConfiguration("inco")
+      .get<boolean>("highlight.enabled", true);
+    if (!enabled) {
+      editor.setDecorations(this.keywordType, []);
+      editor.setDecorations(this.actionType, []);
       return;
     }
 
