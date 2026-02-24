@@ -1,83 +1,86 @@
 # Inco Extension for Visual Studio Code
 
-VSCode extension for [Inco](https://github.com/imnive-design/inco-go) — a compile-time assertion engine for Go.
+The official VS Code extension for [Inco](https://github.com/imnive-design/inco-go) — a powerful compile-time assertion and contract engine for Go.
 
-## Features
+Write clean, declarative contracts directly in your Go code using `@inco:` directives, and let Inco handle the enforcement, error handling, and telemetry.
 
-### Syntax Highlighting
-`@inco:` directives are highlighted with distinct colors for the directive keyword, expression, and action — in both `.inco.go` and regular `.go` files.
+## ✨ Features
 
-### Diagnostics
-Real-time inline diagnostics that:
-- Detect missing expressions after `@inco:`
-- Flag unknown actions
-- Show recognized contracts as informational hints
+### 🎨 Syntax Highlighting & Visuals
+- **Distinct Highlighting**: `@inco:` directives are highlighted with custom colors to stand out from regular comments.
+- **Toggle Support**: Quickly toggle highlighting on/off via the status bar button `$(eye)` or command palette.
+- **Action Colors**: Different actions (panic, return, log) are visually distinct.
 
-### Hover Information
-Hover over any `@inco:` directive to see:
-- The assertion expression
-- The action type
-- A preview of the generated Go guard code
+### 🔍 Real-time Diagnostics & Intelligence
+- **Inline Validation**: Detects invalid directives, missing expressions, or unknown actions immediately.
+- **Build Checks**: Automatically runs `go build -overlay` in the background to catch compile errors within your directives.
+- **Gopls Integration**: Seamlessly syncs with `gopls` to provide autocompletion and hover information even for generated code.
 
-### CodeLens
-Files with `@inco:` directives show:
-- Contract count at the top of the file
-- Quick **Gen** and **Audit** action buttons
+### 📊 Status Bar Integration
+- **Contract Coverage**: Displays the current contract coverage percentage (`inco/(if+inco)`) from `inco audit`.
+- **Quick Controls**: 
+  - Click the coverage stats to run a fresh audit.
+  - Click the `$(eye) Inco HL` button to toggle syntax highlighting.
 
-### Commands
-All Inco CLI commands are available from the Command Palette (`Cmd+Shift+P`):
+### 🛠️ Developer Productivity
+- **Auto-Gen**: Automatically regenerates overlay files on save, keeping your editor in sync.
+- **CodeLens**: Quick "Preview" buttons above directives to specific generated guard code.
+- **Hover**: Hover over any `@inco:` directive to see the exact Go code that will be generated.
+- **Preview**: Open a side-by-side diff view of your source code vs. the generated code.
 
-| Command | Description |
-|---------|-------------|
-| `Inco: Generate Overlay` | Run `inco gen` |
-| `Inco: Build` | Run `inco build ./...` |
-| `Inco: Test` | Run `inco test ./...` |
-| `Inco: Run` | Run `inco run .` |
-| `Inco: Audit` | Run `inco audit` |
-| `Inco: Release` | Run `inco release` |
-| `Inco: Release Clean` | Run `inco release clean` |
-| `Inco: Clean Cache` | Run `inco clean` |
+## 🚀 Commands
 
-### Snippets
+Access these via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 
-| Prefix | Description |
-|--------|-------------|
-| `inco` | Basic directive (default panic) |
-| `incopanic` | Directive with custom panic message |
-| `incoreturn` | Directive with return action |
-| `incocontinue` | Directive with continue action |
-| `incobreak` | Directive with break action |
-| `incolog` | Directive with log action |
-| `inconil` | Nil pointer check |
-| `incoerr` | Inline error assertion |
-| `incopos` | Positive value assertion |
-| `incobounds` | Bounds check |
-| `incolen` | Non-empty string check |
+| Command | Title | Description |
+|:---|:---|:---|
+| `inco.gen` | **Inco: Generate Overlay** | Manually trigger `inco gen`. |
+| `inco.preview` | **Inco: Preview Generated Guard** | Open a diff view of the generated code. |
+| `inco.toggleHighlight` | **Inco: Toggle Highlight** | Toggle `@inco:` syntax highlighting on/off. |
+| `inco.audit` | **Inco: Audit** | Run coverage audit and update status bar. |
+| `inco.run` | **Inco: Run** | Run the project with `inco run`. |
+| `inco.test` | **Inco: Test** | Run tests with `inco test`. |
+| `inco.build` | **Inco: Build** | Build the project with `inco build`. |
+| `inco.clean` | **Inco: Clean Cache** | Clean the internal build cache. |
+| `inco.checkBuild` | **Inco: Check Build Errors** | Manually run the build check mechanism. |
 
-### Auto-gen on Save
-Optionally auto-run `inco gen` when saving `.inco.go` files. Enable via:
-```json
-"inco.genOnSave": true
-```
-
-## Configuration
+## ⚙️ Configuration
 
 | Setting | Default | Description |
-|---------|---------|-------------|
-| `inco.executablePath` | `"inco"` | Path to the `inco` binary |
-| `inco.genOnSave` | `false` | Auto-run `inco gen` on save |
-| `inco.diagnostics.enabled` | `true` | Enable inline diagnostics |
+|:---|:---|:---|
+| `inco.executablePath` | `"inco"` | Path to the `inco` binary (if not in PATH). |
+| `inco.autoGen` | `true` | Automatically run `inco gen` when saving files. |
+| `inco.diagnostics.enabled` | `true` | Enable inline error diagnostics. |
+| `inco.highlight.enabled` | `true` | Enable syntax highlighting for directives. |
+| `inco.buildCheck` | `true` | validating directives by running a background build. |
 
-## Requirements
+## 📝 Usage Example
 
-- [Inco CLI](https://github.com/imnive-design/inco-go) installed and available in your PATH
-- Go workspace with `.inco.go` files
+Simply add `@inco:` comments to your Go code:
 
-## Development
+```go
+func process(user *User) error {
+    // @inco: user != nil, -return(ErrInvalidUser)
+    
+    // @inco: user.Age >= 18, -log("underage access attempt"), -return(ErrUnderage)
 
-```bash
-cd inco-extension
-npm install
-npm run compile
-# Press F5 in VSCode to launch Extension Development Host
+    return nil
+}
 ```
+
+The extension will automatically generate the corresponding guard code in an overlay, keeping your source clean while ensuring runtime safety.
+
+## 📦 Requirements
+
+- **Inco CLI**: The `inco` binary must be installed.
+  ```bash
+  go install github.com/imnive-design/inco-go/cmd/inco@latest
+  ```
+- **Go**: A standard Go development environment.
+
+## 🔧 Troubleshooting
+
+If diagnostics aren't showing up or `gopls` seems out of sync:
+1. Run **Inco: Generate Overlay** manually.
+2. Check the **Output** panel (select "Inco" from the dropdown) for logs.
+3. Ensure `inco` is in your PATH or configured via `inco.executablePath`.

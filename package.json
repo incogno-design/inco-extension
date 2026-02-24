@@ -2,7 +2,7 @@
   "name": "inco",
   "displayName": "inco — incognito",
   "description": "VSCode extension for Inco, a compile-time assertion engine for Go. Provides syntax highlighting, diagnostics, commands, and snippets for @inco: directives.",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "publisher": "imnive-design",
   "license": "MIT",
   "repository": {
