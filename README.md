@@ -47,6 +47,7 @@ All Inco CLI commands are available from the Command Palette (`Cmd+Shift+P`):
 | `incoreturn` | Directive with return action |
 | `incocontinue` | Directive with continue action |
 | `incobreak` | Directive with break action |
+| `incolog` | Directive with log action |
 | `inconil` | Nil pointer check |
 | `incoerr` | Inline error assertion |
 | `incopos` | Positive value assertion |

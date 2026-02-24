@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
+import { getIncoExecutablePath } from "./util";
 
 let statusBarItem: vscode.StatusBarItem;
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -47,7 +48,7 @@ function refreshCoverage() {
   }
 
   const config = vscode.workspace.getConfiguration("inco");
-  const bin = config.get<string>("executablePath") || "inco";
+  const bin = getIncoExecutablePath();
 
   const proc = cp.spawn(bin, ["audit", "."], { cwd, shell: true });
   let stdout = "";

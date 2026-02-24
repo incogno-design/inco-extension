@@ -2,13 +2,13 @@ import * as vscode from "vscode";
 import * as cp from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import { getIncoExecutablePath } from "./util";
 
 /**
  * Returns the configured inco executable path.
  */
 function getIncoPath(): string {
-  const config = vscode.workspace.getConfiguration("inco");
-  return config.get<string>("executablePath") || "inco";
+  return getIncoExecutablePath();
 }
 
 /**
