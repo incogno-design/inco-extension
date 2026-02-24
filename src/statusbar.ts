@@ -3,6 +3,7 @@ import * as cp from "child_process";
 import { getIncoExecutablePath } from "./util";
 
 let statusBarItem: vscode.StatusBarItem;
+let highlightStatusItem: vscode.StatusBarItem;
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 /**
@@ -18,8 +19,16 @@ export function activateStatusBar(context: vscode.ExtensionContext) {
   statusBarItem.tooltip = "Inco contract coverage — click to run audit";
   context.subscriptions.push(statusBarItem);
 
+  highlightStatusItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Left,
+    49
+  );
+  highlightStatusItem.command = "inco.toggleHighlight";
+  context.subscriptions.push(highlightStatusItem);
+
   // Initial refresh
   refreshCoverage();
+  updateHighlightStatus();
 
   // Refresh after saving .inco.go files
   context.subscriptions.push(
@@ -29,6 +38,32 @@ export function activateStatusBar(context: vscode.ExtensionContext) {
       }
     })
   );
+
+  // Listen for config changes
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("inco.highlight.enabled")) {
+        updateHighlightStatus();
+      }
+    })
+  );
+}
+
+function updateHighlightStatus() {
+  const enabled = vscode.workspace
+    .getConfiguration("inco")
+    .get<boolean>("highlight.enabled", true);
+
+  if (enabled) {
+    highlightStatusItem.text = "$(eye) Inco HL";
+    highlightStatusItem.tooltip = "Inco Highlighting: ON (Click to disable)";
+    highlightStatusItem.color = undefined; // Default color
+  } else {
+    highlightStatusItem.text = "$(eye-closed) Inco HL";
+    highlightStatusItem.tooltip = "Inco Highlighting: OFF (Click to enable)";
+    highlightStatusItem.color = new vscode.ThemeColor("terminal.ansiBrightBlack"); // Dimmed
+  }
+  highlightStatusItem.show();
 }
 
 function scheduleRefresh() {

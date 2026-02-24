@@ -150,6 +150,18 @@ export function registerCommands(context: vscode.ExtensionContext) {
       }
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("inco.toggleHighlight", async () => {
+      const config = vscode.workspace.getConfiguration("inco");
+      const current = config.get<boolean>("highlight.enabled", true);
+      await config.update(
+        "highlight.enabled",
+        !current,
+        vscode.ConfigurationTarget.Global
+      );
+    })
+  );
 }
 
 let incoChannel: vscode.OutputChannel | undefined;
