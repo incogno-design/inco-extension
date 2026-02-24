@@ -9,6 +9,7 @@ import * as vscode from "vscode";
  */
 
 const VALID_ACTIONS = new Set(["panic", "return", "continue", "break", "log"]);
+const VALID_IF_ACTIONS = new Set(["log"]);
 
 export class IncoDirectiveDiagnostics {
   private diagnosticCollection: vscode.DiagnosticCollection;
@@ -82,54 +83,83 @@ export class IncoDirectiveDiagnostics {
     // Matches lines where @inco: is at the START of the comment body
     // (after // and optional whitespace), mirroring Go's ^@inco:\s+(.+)$
     const directiveLineRe = /\/\/\s*(@inco:)(\s+.*)?$/;
+    const ifDirectiveLineRe = /\/\/\s*(@if:)(\s+.*)?$/;
 
     for (let i = 0; i < document.lineCount; i++) {
       const line = document.lineAt(i);
       const text = line.text;
 
+      // ── @inco: directive ──────────────────────────────────
       const lineMatch = directiveLineRe.exec(text);
-      if (!lineMatch) {
-        continue;
+      if (lineMatch) {
+        const atIncoIndex = text.indexOf(lineMatch[1], text.indexOf("//"));
+        const commentStart = text.lastIndexOf("//", atIncoIndex);
+
+        const between = text.substring(commentStart + 2, atIncoIndex).trim();
+        if (between.length === 0) {
+          const afterColon = text.substring(atIncoIndex + 6).trim();
+
+          if (!afterColon) {
+            diagnostics.push(
+              new vscode.Diagnostic(
+                new vscode.Range(i, atIncoIndex, i, text.length),
+                "Inco: missing expression after @inco:",
+                vscode.DiagnosticSeverity.Error
+              )
+            );
+          } else {
+            const actionMatch = afterColon.match(
+              /,\s*-([\w]+)(?:\(.*\))?\s*$/
+            );
+            if (actionMatch && !VALID_ACTIONS.has(actionMatch[1])) {
+              const actionStart = text.indexOf(`-${actionMatch[1]}`);
+              diagnostics.push(
+                new vscode.Diagnostic(
+                  new vscode.Range(i, actionStart, i, actionStart + actionMatch[1].length + 1),
+                  `Inco: unknown action '-${actionMatch[1]}'. Valid actions: -panic, -return, -continue, -break, -log`,
+                  vscode.DiagnosticSeverity.Error
+                )
+              );
+            }
+          }
+        }
       }
 
-      const atIncoIndex = text.indexOf(lineMatch[1], text.indexOf("//"));
-      const commentStart = text.lastIndexOf("//", atIncoIndex);
+      // ── @if: directive ────────────────────────────────────
+      const ifMatch = ifDirectiveLineRe.exec(text);
+      if (ifMatch) {
+        const atIfIndex = text.indexOf(ifMatch[1], text.indexOf("//"));
+        const commentStart = text.lastIndexOf("//", atIfIndex);
 
-      // Check that @inco: is the first thing in the comment body
-      const between = text.substring(commentStart + 2, atIncoIndex).trim();
-      if (between.length > 0) {
-        continue;
+        const between = text.substring(commentStart + 2, atIfIndex).trim();
+        if (between.length === 0) {
+          const afterColon = text.substring(atIfIndex + 4).trim();
+
+          if (!afterColon) {
+            diagnostics.push(
+              new vscode.Diagnostic(
+                new vscode.Range(i, atIfIndex, i, text.length),
+                "Inco: missing condition after @if:",
+                vscode.DiagnosticSeverity.Error
+              )
+            );
+          } else {
+            const actionMatch = afterColon.match(
+              /,\s*-([\w]+)(?:\(.*\))?\s*$/
+            );
+            if (actionMatch && !VALID_IF_ACTIONS.has(actionMatch[1])) {
+              const actionStart = text.indexOf(`-${actionMatch[1]}`);
+              diagnostics.push(
+                new vscode.Diagnostic(
+                  new vscode.Range(i, actionStart, i, actionStart + actionMatch[1].length + 1),
+                  `Inco: unknown action '-${actionMatch[1]}' for @if. Valid actions: -log`,
+                  vscode.DiagnosticSeverity.Error
+                )
+              );
+            }
+          }
+        }
       }
-
-      const afterColon = text.substring(atIncoIndex + 6).trim();
-
-      // Empty expression
-      if (!afterColon) {
-        diagnostics.push(
-          new vscode.Diagnostic(
-            new vscode.Range(i, atIncoIndex, i, text.length),
-            "Inco: missing expression after @inco:",
-            vscode.DiagnosticSeverity.Error
-          )
-        );
-        continue;
-      }
-
-      // Check for invalid action
-      const actionMatch = afterColon.match(
-        /,\s*-([\w]+)(?:\(.*\))?\s*$/
-      );
-      if (actionMatch && !VALID_ACTIONS.has(actionMatch[1])) {
-        const actionStart = text.indexOf(`-${actionMatch[1]}`);
-        diagnostics.push(
-          new vscode.Diagnostic(
-            new vscode.Range(i, actionStart, i, actionStart + actionMatch[1].length + 1),
-            `Inco: unknown action '-${actionMatch[1]}'. Valid actions: -panic, -return, -continue, -break, -log`,
-            vscode.DiagnosticSeverity.Error
-          )
-        );
-      }
-
     }
 
     this.diagnosticCollection.set(document.uri, diagnostics);

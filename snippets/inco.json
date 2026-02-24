@@ -53,5 +53,25 @@
     "prefix": "incolen",
     "body": "// @inco: len(${1:s}) > 0, -return(${2:zero, fmt.Errorf(\"empty\")})",
     "description": "Inco non-empty string check"
+  },
+  "Inco: @if conditional": {
+    "prefix": "incoif",
+    "body": "// @if: ${1:condition}",
+    "description": "Inco @if conditional directive — wraps next statement in if block"
+  },
+  "Inco: @if with log": {
+    "prefix": "incoiflog",
+    "body": "// @if: ${1:condition}, -log(\"${2:message}\")",
+    "description": "Inco @if directive with log action"
+  },
+  "Inco: @if nil check": {
+    "prefix": "incoifnil",
+    "body": "// @if: ${1:ptr} != nil",
+    "description": "Inco @if nil pointer conditional"
+  },
+  "Inco: @if error check": {
+    "prefix": "incoiferr",
+    "body": "// @if: ${1:err} != nil",
+    "description": "Inco @if error conditional"
   }
 }
