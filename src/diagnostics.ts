@@ -124,7 +124,7 @@ export class IncoDirectiveDiagnostics {
         diagnostics.push(
           new vscode.Diagnostic(
             new vscode.Range(i, actionStart, i, actionStart + actionMatch[1].length + 1),
-            `Inco: unknown action '-${actionMatch[1]}'. Valid actions: -panic, -return, -continue, -break`,
+            `Inco: unknown action '-${actionMatch[1]}'. Valid actions: -panic, -return, -continue, -break, -log`,
             vscode.DiagnosticSeverity.Error
           )
         );

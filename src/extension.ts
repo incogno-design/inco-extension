@@ -7,6 +7,24 @@ import { registerPreviewCommand } from "./preview";
 import { IncoDecorator } from "./decorator";
 import { activateStatusBar } from "./statusbar";
 
+/** Debounce timer for auto-gen — prevents rapid-fire runs when
+ *  multiple files are opened / saved in quick succession. */
+let genDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+const GEN_DEBOUNCE_MS = 500;
+
+function scheduleGen(reason: string): void {
+  if (genDebounceTimer) {
+    clearTimeout(genDebounceTimer);
+  }
+  genDebounceTimer = setTimeout(() => {
+    genDebounceTimer = undefined;
+    console.log(`[inco] running gen (${reason})`);
+    runGenSilent().catch((e) => {
+      console.error("[inco] runGenSilent unhandled error:", e);
+    });
+  }, GEN_DEBOUNCE_MS);
+}
+
 export function activate(context: vscode.ExtensionContext) {
   console.log("[inco] ★ Extension activated");
   vscode.window.showInformationMessage("Inco extension activated");
@@ -42,11 +60,36 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.languages.registerCodeLensProvider(hoverSelector, new IncoCodeLensProvider())
   );
 
-  // ── Auto-gen: on save only ───────────────────────────────────
-  // inco gen reads from disk, so it only makes sense after save.
-  // Decorator & directive diagnostics already refresh in real-time
-  // from the in-memory buffer — no gen needed for that.
+  // ── Auto-gen: on activation ──────────────────────────────────
+  // Run gen once at startup so the overlay is up-to-date before
+  // the user does anything.
+  {
+    const config = vscode.workspace.getConfiguration("inco");
+    if (config.get<boolean>("autoGen", true)) {
+      console.log("[inco] initial gen on activation");
+      scheduleGen("activation");
+    }
+  }
 
+  // ── Auto-gen: on open ────────────────────────────────────────
+  // When an inco file is opened (e.g. switching tabs, restoring
+  // session), regenerate so diagnostics & overlay stay fresh.
+  context.subscriptions.push(
+    vscode.workspace.onDidOpenTextDocument((doc) => {
+      if (!isIncoGoFile(doc)) {
+        return;
+      }
+      const config = vscode.workspace.getConfiguration("inco");
+      if (!config.get<boolean>("autoGen", true)) {
+        return;
+      }
+      console.log(`[inco] onDidOpen: ${doc.fileName}`);
+      scheduleGen("open");
+    })
+  );
+
+  // ── Auto-gen: on save ────────────────────────────────────────
+  // inco gen reads from disk, so it always makes sense after save.
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
       console.log(`[inco] onDidSave: ${doc.fileName} isIncoGo=${isIncoGoFile(doc)}`);
@@ -59,9 +102,7 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
       console.log("[inco] calling runGenSilent");
-      runGenSilent().catch((e) => {
-        console.error("[inco] runGenSilent unhandled error:", e);
-      });
+      scheduleGen("save");
     })
   );
 }
