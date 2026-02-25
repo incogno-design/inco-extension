@@ -2,7 +2,7 @@
   "name": "inco",
   "displayName": "inco — incognito assertions for Go",
   "description": "VSCode extension for Inco, a compile-time assertion engine for Go. Provides syntax highlighting, diagnostics, commands, and snippets for @inco: directives.",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "publisher": "imnive-design",
   "license": "MIT",
   "repository": {
@@ -27,57 +27,63 @@
   ],
   "icon": "images/icon.png",
   "activationEvents": [
-    "workspaceContains:**/*.inco.go",
-    "workspaceContains:**/*.inco"
+    "onLanguage:go",
+    "workspaceContains:**/*.inco.go"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "inco.gen",
-        "title": "Inco: Generate Overlay",
+        "title": "inco: Generate Overlay",
         "icon": "$(play)"
       },
       {
         "command": "inco.build",
-        "title": "Inco: Build"
+        "title": "inco: Build"
       },
       {
         "command": "inco.test",
-        "title": "Inco: Test"
+        "title": "inco: Test"
       },
       {
         "command": "inco.run",
-        "title": "Inco: Run"
+        "title": "inco: Run"
       },
       {
         "command": "inco.audit",
-        "title": "Inco: Audit (Contract Coverage)"
+        "title": "inco: Audit (Contract Coverage)",
+        "icon": "$(refresh)"
       },
       {
         "command": "inco.release",
-        "title": "Inco: Release (Bake Guards)"
+        "title": "inco: Release (Bake Guards)"
       },
       {
         "command": "inco.releaseClean",
-        "title": "Inco: Release Clean (Revert)"
+        "title": "inco: Release Clean (Revert)"
       },
       {
         "command": "inco.clean",
-        "title": "Inco: Clean Cache"
+        "title": "inco: Clean Cache"
       },
       {
         "command": "inco.checkBuild",
-        "title": "Inco: Check Build Errors (Debug)"
+        "title": "inco: Check Build Errors (Debug)"
       },
       {
         "command": "inco.preview",
-        "title": "Inco: Preview Generated Guard",
+        "title": "inco: Preview Generated Guard",
         "icon": "$(open-preview)"
       },
       {
         "command": "inco.toggleHighlight",
-        "title": "Inco: Toggle Highlight"
+        "title": "inco: Toggle Highlight"
+      },
+      {
+        "command": "inco.fmt",
+        "title": "inco: Format (inco fmt)",
+        "icon": "$(symbol-ruler)"
       }
     ],
     "menus": {
@@ -87,10 +93,17 @@
           "when": "resourceExtname == .go || resourceExtname == .inco",
           "group": "navigation"
         }
+      ],
+      "view/title": [
+        {
+          "command": "inco.audit",
+          "when": "view == inco.auditPanel",
+          "group": "navigation"
+        }
       ]
     },
     "configuration": {
-      "title": "Inco",
+      "title": "inco",
       "properties": {
         "inco.executablePath": {
           "type": "string",
@@ -116,50 +129,32 @@
           "type": "boolean",
           "default": true,
           "description": "Enable syntax highlighting for @inco: directives (keyword and action colors)."
-        },
-        "inco.formatOnSave": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically run 'inco fmt' on .inco.go files before saving."
         }
       }
     },
-    "languages": [
-      {
-        "id": "inco",
-        "aliases": ["Inco", "inco"],
-        "extensions": [".inco", ".inco.go"],
-        "configuration": "./language-configuration.json"
-      }
-    ],
+    "views": {
+      "panel": [
+        {
+          "type": "webview",
+          "id": "inco.auditPanel",
+          "name": "inco Audit"
+        }
+      ]
+    },
+    "languages": [],
     "grammars": [
       {
         "scopeName": "comment.inco.injection",
         "path": "./syntaxes/inco-injection.tmLanguage.json",
         "injectTo": [
-          "source.go",
-          "source.inco.go"
+          "source.go"
         ]
-      },
-      {
-        "language": "inco",
-        "scopeName": "source.inco.go",
-        "path": "./syntaxes/inco-go.tmLanguage.json"
       }
     ],
-    "configurationDefaults": {
-      "[inco]": {
-        "editor.defaultFormatter": "imnive-design.inco",
-        "editor.formatOnSave": true
-      }
-    },
+    "configurationDefaults": {},
     "snippets": [
       {
         "language": "go",
-        "path": "./snippets/inco.json"
-      },
-      {
-        "language": "inco",
         "path": "./snippets/inco.json"
       }
     ]

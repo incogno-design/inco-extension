@@ -4,6 +4,7 @@ import { getIncoExecutablePath } from "./util";
 
 let statusBarItem: vscode.StatusBarItem;
 let highlightStatusItem: vscode.StatusBarItem;
+let fmtStatusItem: vscode.StatusBarItem;
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 /**
@@ -16,7 +17,7 @@ export function activateStatusBar(context: vscode.ExtensionContext) {
     50
   );
   statusBarItem.command = "inco.audit";
-  statusBarItem.tooltip = "Inco contract coverage — click to run audit";
+  statusBarItem.tooltip = "inco contract coverage — click to run audit";
   context.subscriptions.push(statusBarItem);
 
   highlightStatusItem = vscode.window.createStatusBarItem(
@@ -25,6 +26,17 @@ export function activateStatusBar(context: vscode.ExtensionContext) {
   );
   highlightStatusItem.command = "inco.toggleHighlight";
   context.subscriptions.push(highlightStatusItem);
+
+  // Fmt button — next to HL
+  fmtStatusItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Left,
+    48
+  );
+  fmtStatusItem.text = "$(symbol-ruler) inco Fmt";
+  fmtStatusItem.command = "inco.fmt";
+  fmtStatusItem.tooltip = "Run inco fmt ./...";
+  context.subscriptions.push(fmtStatusItem);
+  fmtStatusItem.show();
 
   // Initial refresh
   refreshCoverage();
@@ -55,12 +67,12 @@ function updateHighlightStatus() {
     .get<boolean>("highlight.enabled", true);
 
   if (enabled) {
-    highlightStatusItem.text = "$(eye) Inco HL";
-    highlightStatusItem.tooltip = "Inco Highlighting: ON (Click to disable)";
+    highlightStatusItem.text = "$(eye) inco HL";
+    highlightStatusItem.tooltip = "inco Highlighting: ON (click to disable)";
     highlightStatusItem.color = undefined; // Default color
   } else {
-    highlightStatusItem.text = "$(eye-closed) Inco HL";
-    highlightStatusItem.tooltip = "Inco Highlighting: OFF (Click to enable)";
+    highlightStatusItem.text = "$(eye-closed) inco HL";
+    highlightStatusItem.tooltip = "inco Highlighting: OFF (click to enable)";
     highlightStatusItem.color = new vscode.ThemeColor("terminal.ansiBrightBlack"); // Dimmed
   }
   highlightStatusItem.show();

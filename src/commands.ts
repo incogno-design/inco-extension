@@ -83,6 +83,41 @@ function runIncoCommand(
   });
 }
 
+/**
+ * Runs an inco CLI command and captures stdout+stderr as a string.
+ * Does not write to the output channel or show any UI.
+ */
+export function runIncoCommandCapture(args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const bin = getIncoPath();
+    const cwd =
+      findGoModDir(getWorkspaceDir() || ".") ||
+      getWorkspaceDir() ||
+      ".";
+    const proc = cp.spawn(bin, args, {
+      cwd,
+      shell: true,
+      env: augmentedEnv(),
+    });
+
+    let output = "";
+    proc.stdout?.on("data", (data: Buffer) => {
+      output += data.toString();
+    });
+    proc.stderr?.on("data", (data: Buffer) => {
+      output += data.toString();
+    });
+
+    proc.on("close", () => {
+      resolve(output);
+    });
+
+    proc.on("error", (err) => {
+      reject(err);
+    });
+  });
+}
+
 export function registerCommands(context: vscode.ExtensionContext): vscode.OutputChannel {
   const channel = vscode.window.createOutputChannel("Inco");
   context.subscriptions.push(channel);
@@ -97,7 +132,6 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Outpu
     { id: "inco.build", args: ["build", "./..."], label: "Building" },
     { id: "inco.test", args: ["test", "./..."], label: "Testing" },
     { id: "inco.run", args: ["run", "."], label: "Running" },
-    { id: "inco.audit", args: ["audit"], label: "Auditing contracts" },
     { id: "inco.release", args: ["release"], label: "Releasing guards" },
     {
       id: "inco.releaseClean",
@@ -114,24 +148,38 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Outpu
         try {
           const code = await runIncoCommand(channel, cmd.args);
           if (code === 0) {
-            vscode.window.showInformationMessage(`Inco: ${cmd.label} succeeded.`);
+            vscode.window.showInformationMessage(`inco: ${cmd.label} succeeded.`);
             if (cmd.id === "inco.gen") {
-              await postGenSync();
+              await postGenSync(true); // manual — immediate
             }
           } else {
             vscode.window.showWarningMessage(
-              `Inco: ${cmd.label} exited with code ${code}.`
+              `inco: ${cmd.label} exited with code ${code}.`
             );
           }
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           vscode.window.showErrorMessage(
-            `Inco: ${cmd.label} failed — ${message}`
+            `inco: ${cmd.label} failed — ${message}`
           );
         }
       })
     );
   }
+
+  // inco.fmt — runs silently, no output panel popup, no toast
+  context.subscriptions.push(
+    vscode.commands.registerCommand("inco.fmt", async () => {
+      channel.appendLine(`\n--- Formatting ---`);
+      try {
+        await runIncoCommand(channel, ["fmt", "./..."], { silent: true });
+      } catch (e) {
+        log(`[inco] fmt error: ${e}`);
+      }
+    })
+  );
+
+  // inco.audit — handled by IncoAuditPanel (registered in extension.ts)
 
   // Expose a silent gen runner for auto-gen (no panel popup, no toast)
   incoChannel = channel;
@@ -206,8 +254,38 @@ export async function runGenSilent(): Promise<void> {
 /**
  * Shared post-gen pipeline used by both the manual `inco.gen` command
  * and the silent auto-gen.
+ *
+ * When `immediate` is true (manual command), runs synchronously.
+ * When false (auto-gen on save), debounces with a 1.5s delay so that
+ * rapid successive saves don't thrash gopls with config reloads.
  */
-async function postGenSync(): Promise<void> {
+let postGenTimer: ReturnType<typeof setTimeout> | undefined;
+const POST_GEN_DEBOUNCE_MS = 1500;
+
+async function postGenSync(immediate = false): Promise<void> {
+  if (immediate) {
+    // Manual command — run now, cancel any pending debounce
+    if (postGenTimer) {
+      clearTimeout(postGenTimer);
+      postGenTimer = undefined;
+    }
+    await doPostGenSync();
+    return;
+  }
+
+  // Auto-gen — debounce so gopls isn't thrashed
+  if (postGenTimer) {
+    clearTimeout(postGenTimer);
+  }
+  postGenTimer = setTimeout(() => {
+    postGenTimer = undefined;
+    doPostGenSync().catch((e) => {
+      log(`[inco] debounced postGenSync error: ${e}`);
+    });
+  }, POST_GEN_DEBOUNCE_MS);
+}
+
+async function doPostGenSync(): Promise<void> {
   // 1) gopls overlay — main provider (real-time / incremental)
   //    Wrapped in try/catch so a gopls error never blocks build-check.
   try {
@@ -250,6 +328,16 @@ async function syncGoplsOverlay(): Promise<void> {
   const overlayExists = fs.existsSync(overlayPath);
 
   const gopls = vscode.workspace.getConfiguration("gopls");
+
+  // Check if gopls configuration section is available at all.
+  // In some environments (devcontainers, remote), the Go extension
+  // may not be installed or may not expose this config key.
+  const inspection = gopls.inspect<string[]>("build.buildFlags");
+  if (!inspection) {
+    log("[inco] gopls.build.buildFlags not available in this environment, skipping overlay sync");
+    return;
+  }
+
   const current: string[] = gopls.get<string[]>("build.buildFlags") || [];
 
   // Strip any existing -overlay flag
@@ -266,11 +354,16 @@ async function syncGoplsOverlay(): Promise<void> {
     filtered.some((f, i) => f !== current[i]);
 
   if (changed) {
-    await gopls.update(
-      "build.buildFlags",
-      filtered,
-      vscode.ConfigurationTarget.Workspace
-    );
+    try {
+      await gopls.update(
+        "build.buildFlags",
+        filtered,
+        vscode.ConfigurationTarget.Workspace
+      );
+    } catch (e) {
+      // Silently skip if the config section isn't registered
+      log(`[inco] gopls.build.buildFlags update skipped: ${e}`);
+    }
   }
 }
 
@@ -343,7 +436,7 @@ async function checkBuildErrors(): Promise<void> {
  * checking immediate subdirectories (handles mono-repo layouts where
  * the workspace root is one level above go.mod).
  */
-function findGoModDir(dir: string): string | undefined {
+export function findGoModDir(dir: string): string | undefined {
   // Check dir itself
   if (fs.existsSync(path.join(dir, "go.mod"))) {
     return dir;

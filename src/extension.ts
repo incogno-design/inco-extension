@@ -7,7 +7,8 @@ import { IncoCodeLensProvider } from "./codelens";
 import { registerPreviewCommand } from "./preview";
 import { IncoDecorator } from "./decorator";
 import { activateStatusBar } from "./statusbar";
-import { registerFormatter } from "./formatter";
+import { IncoCompletionProvider } from "./completion";
+import { IncoAuditPanel } from "./auditPanel";
 
 /** Debounce timer for auto-gen — prevents rapid-fire runs when
  *  multiple files are opened / saved in quick succession. */
@@ -29,10 +30,22 @@ function scheduleGen(reason: string): void {
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("[inco] ★ Extension activated");
-  vscode.window.showInformationMessage("Inco extension activated");
+  vscode.window.showInformationMessage("inco extension activated");
 
-  // Register all inco commands (gen, build, test, run, audit, release, clean)
+  // Register all inco commands (gen, build, test, run, release, clean)
   const channel = registerCommands(context);
+
+  // Audit panel — shows `inco audit` output in the sidebar
+  const auditPanel = new IncoAuditPanel();
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      IncoAuditPanel.viewType,
+      auditPanel
+    )
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("inco.audit", () => auditPanel.refresh())
+  );
 
   // Register preview diff command (source ↔ generated shadow)
   registerPreviewCommand(context);
@@ -48,13 +61,9 @@ export function activate(context: vscode.ExtensionContext) {
   // Status bar — shows inco/(if+inco) coverage percentage
   activateStatusBar(context);
 
-  // Formatter — runs `inco fmt` on .inco.go files
-  registerFormatter(context, channel);
-
   // Hover provider — shows directive info on hover
   const hoverSelector: vscode.DocumentSelector = [
-    { language: "go", scheme: "file" },
-    { language: "inco", scheme: "file" },
+    { language: "go", scheme: "file" }
   ];
   context.subscriptions.push(
     vscode.languages.registerHoverProvider(hoverSelector, new IncoHoverProvider())
@@ -63,6 +72,16 @@ export function activate(context: vscode.ExtensionContext) {
   // CodeLens — shows run/audit actions above functions with directives
   context.subscriptions.push(
     vscode.languages.registerCodeLensProvider(hoverSelector, new IncoCodeLensProvider())
+  );
+
+  // Completion Item Provider — for directive actions (-panic, -return, etc.)
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      hoverSelector,
+      new IncoCompletionProvider(),
+      "-", // Trigger characters: dash
+      ","  // Trigger characters: comma
+    )
   );
 
   // ── Auto-gen: on activation ──────────────────────────────────

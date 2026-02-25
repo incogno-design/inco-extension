@@ -1,86 +1,100 @@
-# Inco Extension for Visual Studio Code
+# inco — VS Code Extension
 
-The official VS Code extension for [Inco](https://github.com/imnive-design/inco-go) — a powerful compile-time assertion and contract engine for Go.
+The official VS Code extension for [inco](https://github.com/imnive-design/inco) — a compile-time assertion and contract engine for Go.
 
-Write clean, declarative contracts directly in your Go code using `@inco:` directives, and let Inco handle the enforcement, error handling, and telemetry.
+Write declarative contracts in your Go code using `@inco:` directives. The extension provides real-time feedback, code generation, and tooling integration.
 
-## ✨ Features
+## Features
 
-### 🎨 Syntax Highlighting & Visuals
-- **Distinct Highlighting**: `@inco:` directives are highlighted with custom colors to stand out from regular comments.
-- **Toggle Support**: Quickly toggle highlighting on/off via the status bar button `$(eye)` or command palette.
-- **Action Colors**: Different actions (panic, return, log) are visually distinct.
+### Syntax Highlighting
+- **Directive Highlighting**: `@inco:` and `@if:` directives are highlighted with distinct colors via TextMate grammar injection.
+- **Action Colors**: Keywords (`@inco:`, `@if:`) and actions (`-panic`, `-return`, `-log`, etc.) use different colors for readability.
+- **Toggle**: Quickly toggle highlighting on/off via the status bar or command palette.
 
-### 🔍 Real-time Diagnostics & Intelligence
-- **Inline Validation**: Detects invalid directives, missing expressions, or unknown actions immediately.
-- **Build Checks**: Automatically runs `go build -overlay` in the background to catch compile errors within your directives.
-- **Gopls Integration**: Seamlessly syncs with `gopls` to provide autocompletion and hover information even for generated code.
+### Diagnostics
+- **Inline Validation**: Detects invalid directives, missing expressions, or unknown actions as you type.
+- **Build Checks**: Runs `go build -overlay` in the background to catch compile errors in directive expressions.
+- **gopls Integration**: Syncs overlay files with `gopls` via `-overlay` build flag for accurate editor intelligence.
 
-### 📊 Status Bar Integration
-- **Contract Coverage**: Displays the current contract coverage percentage (`inco/(if+inco)`) from `inco audit`.
-- **Quick Controls**: 
-  - Click the coverage stats to run a fresh audit.
-  - Click the `$(eye) Inco HL` button to toggle syntax highlighting.
+### Smart Completion
+- **Action Suggestions**: After typing a comma in a directive line, auto-complete suggests available actions: `-panic`, `-return`, `-log`, `-continue`, `-break`.
+- **Snippet Support**: Completions include snippet placeholders for action arguments (e.g., `-return(val)`).
 
-### 🛠️ Developer Productivity
-- **Auto-Gen**: Automatically regenerates overlay files on save, keeping your editor in sync.
-- **CodeLens**: Quick "Preview" buttons above directives to specific generated guard code.
-- **Hover**: Hover over any `@inco:` directive to see the exact Go code that will be generated.
-- **Preview**: Open a side-by-side diff view of your source code vs. the generated code.
+### Hover & Preview
+- **Hover**: Hover over any `@inco:` or `@if:` directive to see the exact guard code that will be generated.
+- **Preview Diff**: Open a side-by-side diff view comparing your source file with the generated overlay.
 
-## 🚀 Commands
+### CodeLens
+- Displays the total directive count at the top of each `.inco.go` file.
+- Provides inline **Gen**, **Audit**, and **Preview** quick-action buttons.
 
-Access these via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
+### Status Bar
+Three buttons in the status bar:
+- **Coverage %**: Shows contract coverage ratio from `inco audit`. Click to run audit.
+- **inco HL**: Toggle directive syntax highlighting on/off.
+- **Fmt**: Run `inco fmt ./...` on the workspace.
+
+### Auto-Gen
+- Automatically runs `inco gen` on save for `.inco.go` files (configurable).
+- Post-gen sync with gopls is debounced (1.5s) to avoid editor thrashing.
+
+### Snippets
+- 16 built-in snippets for common `@inco:` patterns in Go files.
+
+## Commands
+
+Access via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 
 | Command | Title | Description |
 |:---|:---|:---|
-| `inco.gen` | **Inco: Generate Overlay** | Manually trigger `inco gen`. |
-| `inco.preview` | **Inco: Preview Generated Guard** | Open a diff view of the generated code. |
-| `inco.toggleHighlight` | **Inco: Toggle Highlight** | Toggle `@inco:` syntax highlighting on/off. |
-| `inco.audit` | **Inco: Audit** | Run coverage audit and update status bar. |
-| `inco.run` | **Inco: Run** | Run the project with `inco run`. |
-| `inco.test` | **Inco: Test** | Run tests with `inco test`. |
-| `inco.build` | **Inco: Build** | Build the project with `inco build`. |
-| `inco.clean` | **Inco: Clean Cache** | Clean the internal build cache. |
-| `inco.checkBuild` | **Inco: Check Build Errors** | Manually run the build check mechanism. |
+| `inco.gen` | inco: Generate Overlay | Run `inco gen` to generate overlay files. |
+| `inco.build` | inco: Build | Build the project with `inco build`. |
+| `inco.test` | inco: Test | Run tests with `inco test`. |
+| `inco.run` | inco: Run | Run the project with `inco run`. |
+| `inco.audit` | inco: Audit (Contract Coverage) | Run audit, show results in a temporary document. |
+| `inco.release` | inco: Release (Bake Guards) | Bake generated guards into source files. |
+| `inco.releaseClean` | inco: Release Clean (Revert) | Revert a previous release bake. |
+| `inco.clean` | inco: Clean Cache | Clean the internal build cache. |
+| `inco.fmt` | inco: Format (inco fmt) | Run `inco fmt ./...` on the workspace. |
+| `inco.preview` | inco: Preview Generated Guard | Open a diff view of source vs. generated code. |
+| `inco.toggleHighlight` | inco: Toggle Highlight | Toggle directive syntax highlighting. |
+| `inco.checkBuild` | inco: Check Build Errors (Debug) | Manually trigger a build-check for diagnostics. |
 
-## ⚙️ Configuration
+## Configuration
 
 | Setting | Default | Description |
 |:---|:---|:---|
 | `inco.executablePath` | `"inco"` | Path to the `inco` binary (if not in PATH). |
-| `inco.autoGen` | `true` | Automatically run `inco gen` when saving files. |
-| `inco.diagnostics.enabled` | `true` | Enable inline error diagnostics. |
+| `inco.autoGen` | `true` | Automatically run `inco gen` on save in `.inco.go` files. |
+| `inco.diagnostics.enabled` | `true` | Enable inline error diagnostics for directives. |
 | `inco.highlight.enabled` | `true` | Enable syntax highlighting for directives. |
-| `inco.buildCheck` | `true` | validating directives by running a background build. |
+| `inco.buildCheck` | `true` | Run `go build -overlay` after gen to catch compile errors. |
 
-## 📝 Usage Example
+## Usage
 
-Simply add `@inco:` comments to your Go code:
+Add `@inco:` comments to your Go code (in `.inco.go` files):
 
 ```go
 func process(user *User) error {
     // @inco: user != nil, -return(ErrInvalidUser)
-    
-    // @inco: user.Age >= 18, -log("underage access attempt"), -return(ErrUnderage)
 
     return nil
 }
 ```
 
-The extension will automatically generate the corresponding guard code in an overlay, keeping your source clean while ensuring runtime safety.
+The extension automatically generates guard code in an overlay file, keeping your source clean while ensuring runtime safety.
 
-## 📦 Requirements
+## Requirements
 
-- **Inco CLI**: The `inco` binary must be installed.
+- **inco CLI**: Install with:
   ```bash
   go install github.com/imnive-design/inco-go/cmd/inco@latest
   ```
 - **Go**: A standard Go development environment.
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
-If diagnostics aren't showing up or `gopls` seems out of sync:
-1. Run **Inco: Generate Overlay** manually.
-2. Check the **Output** panel (select "Inco" from the dropdown) for logs.
-3. Ensure `inco` is in your PATH or configured via `inco.executablePath`.
+If diagnostics or gopls integration aren't working:
+1. Run **inco: Generate Overlay** from the command palette.
+2. Check the **Output** panel (select "inco" from the dropdown) for logs.
+3. Ensure `inco` is in your PATH or set `inco.executablePath` in settings.
