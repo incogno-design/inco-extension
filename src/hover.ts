@@ -4,7 +4,7 @@ const INCO_DIRECTIVE_RE =
   /\/\/\s*@inco:\s+(.+?)(?:,\s*-(panic|return|continue|break|log)(?:\((.+)\))?)?\s*$/;
 
 const IF_DIRECTIVE_RE =
-  /\/\/\s*@if:\s+(.+?)(?:,\s*-(log)(?:\((.+)\))?)?\s*$/;
+  /\/\/\s*@if:\s+(.+?)(?:,\s*-(panic|return|continue|break|log)(?:\((.+)\))?)?\s*$/;
 
 export class IncoHoverProvider implements vscode.HoverProvider {
   provideHover(
@@ -123,13 +123,36 @@ function generateIfGuardPreview(
   action: string | undefined,
   actionArgs: string
 ): string {
-  let body = "    // <next statement>";
-  if (action === "log") {
-    if (actionArgs) {
-      body = `    log.Printf(${actionArgs})\n    // <next statement>`;
-    } else {
-      body = `    log.Printf("@if: ${condition}")\n    // <next statement>`;
-    }
+  if (!action) {
+    return `if ${condition} {\n    // <next statement>\n}`;
   }
-  return `if ${condition} {\n${body}\n}`;
+
+  switch (action) {
+    case "panic":
+      if (actionArgs) {
+        return `if ${condition} {\n    panic(${actionArgs})\n}`;
+      }
+      return `if ${condition} {\n    panic("@if: ${condition}")\n}`;
+
+    case "return":
+      if (actionArgs) {
+        return `if ${condition} {\n    return ${actionArgs}\n}`;
+      }
+      return `if ${condition} {\n    return\n}`;
+
+    case "continue":
+      return `if ${condition} {\n    continue\n}`;
+
+    case "break":
+      return `if ${condition} {\n    break\n}`;
+
+    case "log":
+      if (actionArgs) {
+        return `if ${condition} {\n    log.Printf(${actionArgs})\n    // <next statement>\n}`;
+      }
+      return `if ${condition} {\n    log.Printf("@if: ${condition}")\n    // <next statement>\n}`;
+
+    default:
+      return `if ${condition} {\n    // <next statement>\n}`;
+  }
 }

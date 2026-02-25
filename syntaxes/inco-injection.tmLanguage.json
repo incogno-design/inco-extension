@@ -21,7 +21,7 @@
     },
     {
       "name": "comment.line.double-slash.inco.if.directive",
-      "match": "(//\\s*)(@if:)(\\s+)(.+?)(?:(,\\s*)(-(log))(\\((.+?)\\))?)?(\\s*)$",
+      "match": "(//\\s*)(@if:)(\\s+)(.+?)(?:(,\\s*)(-(panic|return|continue|break|log))(\\((.+?)\\))?)?(\\s*)$",
       "captures": {
         "1": { "name": "punctuation.definition.comment.go" },
         "2": { "name": "comment.line.double-slash.inco.keyword" },

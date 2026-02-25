@@ -6,6 +6,7 @@ import { IncoCodeLensProvider } from "./codelens";
 import { registerPreviewCommand } from "./preview";
 import { IncoDecorator } from "./decorator";
 import { activateStatusBar } from "./statusbar";
+import { registerFormatter } from "./formatter";
 
 /** Debounce timer for auto-gen — prevents rapid-fire runs when
  *  multiple files are opened / saved in quick succession. */
@@ -45,6 +46,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Status bar — shows inco/(if+inco) coverage percentage
   activateStatusBar(context);
+
+  // Formatter — runs `inco fmt` on .inco.go files
+  registerFormatter(context);
 
   // Hover provider — shows directive info on hover
   const hoverSelector: vscode.DocumentSelector = [

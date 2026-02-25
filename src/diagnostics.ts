@@ -9,7 +9,6 @@ import * as vscode from "vscode";
  */
 
 const VALID_ACTIONS = new Set(["panic", "return", "continue", "break", "log"]);
-const VALID_IF_ACTIONS = new Set(["log"]);
 
 export class IncoDirectiveDiagnostics {
   private diagnosticCollection: vscode.DiagnosticCollection;
@@ -147,12 +146,12 @@ export class IncoDirectiveDiagnostics {
             const actionMatch = afterColon.match(
               /,\s*-([\w]+)(?:\(.*\))?\s*$/
             );
-            if (actionMatch && !VALID_IF_ACTIONS.has(actionMatch[1])) {
+            if (actionMatch && !VALID_ACTIONS.has(actionMatch[1])) {
               const actionStart = text.indexOf(`-${actionMatch[1]}`);
               diagnostics.push(
                 new vscode.Diagnostic(
                   new vscode.Range(i, actionStart, i, actionStart + actionMatch[1].length + 1),
-                  `Inco: unknown action '-${actionMatch[1]}' for @if. Valid actions: -log`,
+                  `Inco: unknown action '-${actionMatch[1]}' for @if. Valid actions: -panic, -return, -continue, -break, -log`,
                   vscode.DiagnosticSeverity.Error
                 )
               );
