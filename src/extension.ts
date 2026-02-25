@@ -31,7 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.window.showInformationMessage("Inco extension activated");
 
   // Register all inco commands (gen, build, test, run, audit, release, clean)
-  registerCommands(context);
+  const channel = registerCommands(context);
 
   // Register preview diff command (source ↔ generated shadow)
   registerPreviewCommand(context);
@@ -48,7 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
   activateStatusBar(context);
 
   // Formatter — runs `inco fmt` on .inco.go files
-  registerFormatter(context);
+  registerFormatter(context, channel);
 
   // Hover provider — shows directive info on hover
   const hoverSelector: vscode.DocumentSelector = [

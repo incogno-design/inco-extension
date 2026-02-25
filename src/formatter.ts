@@ -1,9 +1,11 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
 import * as path from "path";
-import * as fs from "fs";
 import * as os from "os";
 import { getIncoExecutablePath } from "./util";
+
+/** Shared output channel — set by registerFormatter. */
+let log: (msg: string) => void = console.log;
 
 /**
  * Returns a copy of process.env with go/inco bin dirs on PATH.
@@ -21,95 +23,74 @@ function augmentedEnv(): NodeJS.ProcessEnv {
 }
 
 /**
- * Runs `inco fmt` on a file and returns the formatted content.
- *
- * Strategy: write the document text to a temp file, run `inco fmt <tempfile>`,
- * read the result back. This mirrors how `go fmt` works (in-place formatting)
- * while keeping the editor buffer clean.
+ * Pipes `text` through a command via stdin → stdout and returns the output.
+ * If the command exits non-zero or errors, resolves with `null`.
  */
-function runIncoFmt(text: string, fileName: string): Promise<string> {
+function pipeThrough(
+  cmd: string,
+  args: string[],
+  text: string
+): Promise<string | null> {
   return new Promise((resolve) => {
-    const bin = getIncoExecutablePath();
-    const tmpDir = os.tmpdir();
-    const baseName = path.basename(fileName);
-    const tmpFile = path.join(tmpDir, `inco-fmt-${Date.now()}-${baseName}`);
-
-    fs.writeFileSync(tmpFile, text, "utf-8");
-
-    const proc = cp.spawn(bin, ["fmt", tmpFile], {
+    const proc = cp.spawn(cmd, args, {
       shell: true,
       env: augmentedEnv(),
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
+    let stdout = "";
     let stderr = "";
 
-    proc.stderr?.on("data", (data: Buffer) => {
-      stderr += data.toString();
-    });
+    proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
+    proc.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
 
     proc.on("close", (code) => {
-      try {
-        if (code === 0) {
-          const formatted = fs.readFileSync(tmpFile, "utf-8");
-          resolve(formatted);
-        } else {
-          // inco fmt failed — fallback to go fmt
-          console.log(`[inco] inco fmt exited with code ${code}: ${stderr}`);
-          resolve(runGoFmt(text, tmpFile));
+      if (code === 0 && stdout.length > 0) {
+        resolve(stdout);
+      } else {
+        if (stderr) {
+          log(`[inco fmt] ${cmd} ${args.join(" ")} failed (code ${code}): ${stderr.trim()}`);
         }
-      } catch {
-        // Clean up and fallback
-        resolve(runGoFmt(text, tmpFile));
+        resolve(null);
       }
     });
 
     proc.on("error", (err) => {
-      console.log(`[inco] inco fmt error: ${err.message}`);
-      // inco binary not found — fallback to go fmt
-      resolve(runGoFmt(text, tmpFile));
+      log(`[inco fmt] ${cmd} spawn error: ${err.message}`);
+      resolve(null);
     });
+
+    proc.stdin.write(text);
+    proc.stdin.end();
   });
 }
 
 /**
- * Fallback: runs `gofmt` on the temp file.
- * Cleans up the temp file after finishing.
+ * Formats text by trying `inco fmt` first (stdin → stdout),
+ * falling back to `gofmt` if inco fmt fails.
+ *
+ * Both `inco fmt` and `gofmt` support reading from stdin when
+ * no file arguments are given.
  */
-function runGoFmt(text: string, tmpFile: string): Promise<string> {
-  return new Promise((resolve) => {
-    // Re-write original text in case inco fmt partially modified the file
-    try {
-      fs.writeFileSync(tmpFile, text, "utf-8");
-    } catch {
-      resolve(text);
-      return;
-    }
+async function formatText(text: string): Promise<string> {
+  // 1) Try inco fmt (stdin/stdout, no file arg = read stdin)
+  const bin = getIncoExecutablePath();
+  const incoResult = await pipeThrough(bin, ["fmt"], text);
+  if (incoResult !== null) {
+    log("[inco fmt] formatted via inco fmt");
+    return incoResult;
+  }
 
-    const proc = cp.spawn("gofmt", ["-w", tmpFile], {
-      shell: true,
-      env: augmentedEnv(),
-    });
+  // 2) Fallback: gofmt (always reads stdin when no file arg)
+  log("[inco fmt] inco fmt failed, falling back to gofmt");
+  const gofmtResult = await pipeThrough("gofmt", [], text);
+  if (gofmtResult !== null) {
+    log("[inco fmt] formatted via gofmt fallback");
+    return gofmtResult;
+  }
 
-    proc.on("close", (code) => {
-      try {
-        if (code === 0) {
-          const formatted = fs.readFileSync(tmpFile, "utf-8");
-          resolve(formatted);
-        } else {
-          console.log(`[inco] gofmt fallback exited with code ${code}`);
-          resolve(text);
-        }
-      } finally {
-        try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
-      }
-    });
-
-    proc.on("error", (err) => {
-      console.log(`[inco] gofmt fallback error: ${err.message}`);
-      try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
-      resolve(text);
-    });
-  });
+  log("[inco fmt] gofmt also failed, returning original text");
+  return text;
 }
 
 /**
@@ -138,10 +119,8 @@ export class IncoFormattingProvider
   async provideDocumentFormattingEdits(
     document: vscode.TextDocument
   ): Promise<vscode.TextEdit[]> {
-    const formatted = await runIncoFmt(
-      document.getText(),
-      document.fileName
-    );
+    log(`[inco fmt] provideDocumentFormattingEdits: ${document.fileName}`);
+    const formatted = await formatText(document.getText());
     return fullDocumentEdit(document, formatted);
   }
 }
@@ -150,7 +129,18 @@ export class IncoFormattingProvider
  * Registers the inco formatter for .inco.go files and a
  * willSaveTextDocument hook that runs `inco fmt` before save.
  */
-export function registerFormatter(context: vscode.ExtensionContext) {
+export function registerFormatter(
+  context: vscode.ExtensionContext,
+  channel?: vscode.OutputChannel
+) {
+  // Wire up logging to the Inco output channel if available
+  if (channel) {
+    log = (msg: string) => {
+      console.log(msg);
+      channel.appendLine(msg);
+    };
+  }
+
   // Document selector: only .inco.go files (language is "go" via files.associations)
   const selector: vscode.DocumentSelector = [
     { language: "go", scheme: "file", pattern: "**/*.inco.go" },
@@ -175,13 +165,15 @@ export function registerFormatter(context: vscode.ExtensionContext) {
         return;
       }
 
+      log(`[inco fmt] onWillSave: ${e.document.fileName}`);
+
       e.waitUntil(
-        runIncoFmt(e.document.getText(), e.document.fileName).then(
-          (formatted) => fullDocumentEdit(e.document, formatted)
+        formatText(e.document.getText()).then((formatted) =>
+          fullDocumentEdit(e.document, formatted)
         )
       );
     })
   );
 
-  console.log("[inco] formatter registered for *.inco.go files");
+  log("[inco] formatter registered for *.inco.go files");
 }

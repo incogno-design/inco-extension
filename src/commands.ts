@@ -83,7 +83,7 @@ function runIncoCommand(
   });
 }
 
-export function registerCommands(context: vscode.ExtensionContext) {
+export function registerCommands(context: vscode.ExtensionContext): vscode.OutputChannel {
   const channel = vscode.window.createOutputChannel("Inco");
   context.subscriptions.push(channel);
 
@@ -162,6 +162,8 @@ export function registerCommands(context: vscode.ExtensionContext) {
       );
     })
   );
+
+  return channel;
 }
 
 let incoChannel: vscode.OutputChannel | undefined;
