@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { registerCommands, runGenSilent } from "./commands";
 import { IncoDirectiveDiagnostics } from "./diagnostics";
 import { IncoHoverProvider } from "./hover";
@@ -112,5 +113,10 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 function isIncoGoFile(doc: vscode.TextDocument): boolean {
-  return doc.fileName.endsWith(".inco.go") || doc.fileName.endsWith(".inco");
+  const name = doc.fileName;
+  // Exclude formatter temp files (e.g. .inco-fmt-1234567890-foo.inco.go)
+  if (path.basename(name).startsWith(".inco-fmt-")) {
+    return false;
+  }
+  return name.endsWith(".inco.go") || name.endsWith(".inco");
 }

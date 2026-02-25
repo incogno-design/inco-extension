@@ -73,7 +73,7 @@ export class IncoDirectiveDiagnostics {
   }
 
   private analyzeDocument(document: vscode.TextDocument) {
-    if (document.languageId !== "go") {
+    if (document.languageId !== "go" && document.languageId !== "inco") {
       return;
     }
 

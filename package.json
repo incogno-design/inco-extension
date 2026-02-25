@@ -128,7 +128,7 @@
       {
         "id": "inco",
         "aliases": ["Inco", "inco"],
-        "extensions": [".inco"],
+        "extensions": [".inco", ".inco.go"],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -138,21 +138,19 @@
         "path": "./syntaxes/inco-injection.tmLanguage.json",
         "injectTo": [
           "source.go",
-          "source.inco"
+          "source.inco.go"
         ]
       },
       {
         "language": "inco",
-        "scopeName": "source.inco",
+        "scopeName": "source.inco.go",
         "path": "./syntaxes/inco-go.tmLanguage.json"
       }
     ],
     "configurationDefaults": {
-      "files.associations": {
-        "*.inco.go": "go"
-      },
       "[inco]": {
-        "editor.defaultFormatter": null
+        "editor.defaultFormatter": "imnive-design.inco",
+        "editor.formatOnSave": true
       }
     },
     "snippets": [
