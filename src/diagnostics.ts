@@ -1,18 +1,48 @@
 import * as vscode from "vscode";
+import * as cp from "child_process";
+import * as path from "path";
+import { getIncoExecutablePath } from "./util";
+import { findGoModDir } from "./commands";
 
 /**
- * Regex matching @inco: directive action suffix.
+ * LSP-compatible diagnostic returned by `inco diagnose <file>`.
  *
- * Uses greedy .+ for expression (matches Go's actionRe behavior:
- * backtracks to find the LAST top-level ", -action...").
- * Action args also use greedy .+ to match Go's (.+) group.
+ * Severity levels: 1=error, 2=warning, 3=info, 4=hint
+ * Codes: parse-error, parse-warning, invalid-directive, spacing, unguarded
  */
+interface IncoDiagnostic {
+  path: string;
+  range: {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+  };
+  severity: number;
+  source: string;
+  message: string;
+  code: string;
+}
 
-const VALID_ACTIONS = new Set(["panic", "return", "continue", "break", "log"]);
+const SEVERITY_MAP: Record<number, vscode.DiagnosticSeverity> = {
+  1: vscode.DiagnosticSeverity.Error,
+  2: vscode.DiagnosticSeverity.Warning,
+  3: vscode.DiagnosticSeverity.Information,
+  4: vscode.DiagnosticSeverity.Hint,
+};
 
+/**
+ * Provides diagnostics for .inco.go files by invoking the
+ * `inco diagnose <file>` CLI command and parsing its LSP-compatible
+ * JSON output.
+ *
+ * Replaces the previous client-side regex approach with the richer
+ * diagnostics from the inco engine (parse-error, invalid-directive,
+ * spacing, unguarded, etc.).
+ */
 export class IncoDirectiveDiagnostics {
   private diagnosticCollection: vscode.DiagnosticCollection;
   private enabled: boolean;
+  private debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private static readonly DEBOUNCE_MS = 300;
 
   constructor(private context: vscode.ExtensionContext) {
     this.diagnosticCollection =
@@ -25,27 +55,27 @@ export class IncoDirectiveDiagnostics {
   activate() {
     this.context.subscriptions.push(this.diagnosticCollection);
 
-    // Analyze open documents
+    // Diagnose already-open documents
     if (this.enabled) {
       for (const doc of vscode.workspace.textDocuments) {
-        this.analyzeDocument(doc);
+        this.scheduleDiagnose(doc);
       }
     }
 
-    // Analyze on open
+    // Diagnose on open
     this.context.subscriptions.push(
       vscode.workspace.onDidOpenTextDocument((doc) => {
         if (this.enabled) {
-          this.analyzeDocument(doc);
+          this.scheduleDiagnose(doc);
         }
       })
     );
 
-    // Analyze on change
+    // Diagnose on save (`inco diagnose` reads from disk)
     this.context.subscriptions.push(
-      vscode.workspace.onDidChangeTextDocument((e) => {
+      vscode.workspace.onDidSaveTextDocument((doc) => {
         if (this.enabled) {
-          this.analyzeDocument(e.document);
+          this.scheduleDiagnose(doc);
         }
       })
     );
@@ -72,95 +102,129 @@ export class IncoDirectiveDiagnostics {
     );
   }
 
-  private analyzeDocument(document: vscode.TextDocument) {
-    if (document.languageId !== "go" && document.languageId !== "inco") {
+  /**
+   * Debounces diagnose calls per-file to avoid thrashing the CLI
+   * when rapid saves occur.
+   */
+  private scheduleDiagnose(doc: vscode.TextDocument) {
+    if (!this.isIncoFile(doc)) {
       return;
     }
 
-    const diagnostics: vscode.Diagnostic[] = [];
-
-    // Matches lines where @inco: is at the START of the comment body
-    // (after // and optional whitespace), mirroring Go's ^@inco:\s+(.+)$
-    const directiveLineRe = /\/\/\s*(@inco:)(\s+.*)?$/;
-    const ifDirectiveLineRe = /\/\/\s*(@if:)(\s+.*)?$/;
-
-    for (let i = 0; i < document.lineCount; i++) {
-      const line = document.lineAt(i);
-      const text = line.text;
-
-      // ── @inco: directive ──────────────────────────────────
-      const lineMatch = directiveLineRe.exec(text);
-      if (lineMatch) {
-        const atIncoIndex = text.indexOf(lineMatch[1], text.indexOf("//"));
-        const commentStart = text.lastIndexOf("//", atIncoIndex);
-
-        const between = text.substring(commentStart + 2, atIncoIndex).trim();
-        if (between.length === 0) {
-          const afterColon = text.substring(atIncoIndex + 6).trim();
-
-          if (!afterColon) {
-            diagnostics.push(
-              new vscode.Diagnostic(
-                new vscode.Range(i, atIncoIndex, i, text.length),
-                "Inco: missing expression after @inco:",
-                vscode.DiagnosticSeverity.Error
-              )
-            );
-          } else {
-            const actionMatch = afterColon.match(
-              /,\s*-([\w]+)(?:\(.*\))?\s*$/
-            );
-            if (actionMatch && !VALID_ACTIONS.has(actionMatch[1])) {
-              const actionStart = text.indexOf(`-${actionMatch[1]}`);
-              diagnostics.push(
-                new vscode.Diagnostic(
-                  new vscode.Range(i, actionStart, i, actionStart + actionMatch[1].length + 1),
-                  `Inco: unknown action '-${actionMatch[1]}'. Valid actions: -panic, -return, -continue, -break, -log`,
-                  vscode.DiagnosticSeverity.Error
-                )
-              );
-            }
-          }
-        }
-      }
-
-      // ── @if: directive ────────────────────────────────────
-      const ifMatch = ifDirectiveLineRe.exec(text);
-      if (ifMatch) {
-        const atIfIndex = text.indexOf(ifMatch[1], text.indexOf("//"));
-        const commentStart = text.lastIndexOf("//", atIfIndex);
-
-        const between = text.substring(commentStart + 2, atIfIndex).trim();
-        if (between.length === 0) {
-          const afterColon = text.substring(atIfIndex + 4).trim();
-
-          if (!afterColon) {
-            diagnostics.push(
-              new vscode.Diagnostic(
-                new vscode.Range(i, atIfIndex, i, text.length),
-                "Inco: missing condition after @if:",
-                vscode.DiagnosticSeverity.Error
-              )
-            );
-          } else {
-            const actionMatch = afterColon.match(
-              /,\s*-([\w]+)(?:\(.*\))?\s*$/
-            );
-            if (actionMatch && !VALID_ACTIONS.has(actionMatch[1])) {
-              const actionStart = text.indexOf(`-${actionMatch[1]}`);
-              diagnostics.push(
-                new vscode.Diagnostic(
-                  new vscode.Range(i, actionStart, i, actionStart + actionMatch[1].length + 1),
-                  `Inco: unknown action '-${actionMatch[1]}' for @if. Valid actions: -panic, -return, -continue, -break, -log`,
-                  vscode.DiagnosticSeverity.Error
-                )
-              );
-            }
-          }
-        }
-      }
+    const key = doc.uri.toString();
+    const existing = this.debounceTimers.get(key);
+    if (existing) {
+      clearTimeout(existing);
     }
 
-    this.diagnosticCollection.set(document.uri, diagnostics);
+    this.debounceTimers.set(
+      key,
+      setTimeout(() => {
+        this.debounceTimers.delete(key);
+        this.runDiagnose(doc);
+      }, IncoDirectiveDiagnostics.DEBOUNCE_MS)
+    );
+  }
+
+  /**
+   * Invokes `inco diagnose <relative-path>` and maps the JSON output
+   * to VS Code diagnostics.
+   */
+  private async runDiagnose(doc: vscode.TextDocument) {
+    const wsFolder = vscode.workspace.getWorkspaceFolder(doc.uri);
+    if (!wsFolder) {
+      return;
+    }
+
+    const wsDir = wsFolder.uri.fsPath;
+    const goModDir = findGoModDir(wsDir) || wsDir;
+    const relPath = path.relative(goModDir, doc.uri.fsPath);
+    const bin = getIncoExecutablePath();
+
+    try {
+      const output = await this.execDiagnose(bin, relPath, goModDir);
+      const diags = this.parseDiagnostics(output);
+      this.diagnosticCollection.set(doc.uri, diags);
+    } catch (err) {
+      console.error(`[inco] diagnose error for ${relPath}: ${err}`);
+    }
+  }
+
+  /**
+   * Spawns `inco diagnose <file>` and captures stdout.
+   */
+  private execDiagnose(
+    bin: string,
+    file: string,
+    cwd: string
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const proc = cp.spawn(bin, ["diagnose", file], {
+        cwd,
+        env: this.augmentedEnv(),
+      });
+
+      let stdout = "";
+      let stderr = "";
+      proc.stdout?.on("data", (d: Buffer) => (stdout += d.toString()));
+      proc.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
+
+      proc.on("close", (code) => {
+        // `inco diagnose` writes JSON to stdout regardless of exit code.
+        // Use stdout if available, otherwise stderr may contain error info.
+        resolve(stdout || stderr);
+      });
+
+      proc.on("error", reject);
+    });
+  }
+
+  /**
+   * Parses the JSON array from `inco diagnose` into VS Code diagnostics.
+   */
+  private parseDiagnostics(output: string): vscode.Diagnostic[] {
+    try {
+      const items: IncoDiagnostic[] = JSON.parse(output);
+      if (!Array.isArray(items)) {
+        return [];
+      }
+      return items.map((item) => {
+        const range = new vscode.Range(
+          item.range.start.line,
+          item.range.start.character,
+          item.range.end.line,
+          item.range.end.character
+        );
+        const severity =
+          SEVERITY_MAP[item.severity] ??
+          vscode.DiagnosticSeverity.Information;
+        const diag = new vscode.Diagnostic(range, item.message, severity);
+        diag.source = item.source || "inco";
+        diag.code = item.code;
+        return diag;
+      });
+    } catch {
+      // Not valid JSON (e.g. command not found, empty output) — no diagnostics
+      return [];
+    }
+  }
+
+  private augmentedEnv(): NodeJS.ProcessEnv {
+    const env = { ...process.env };
+    const goPath = env.GOPATH || path.join(env.HOME || "", "go");
+    const goBin = path.join(goPath, "bin");
+    const currentPath = env.PATH || "/usr/bin:/bin:/usr/sbin:/sbin";
+    if (!currentPath.includes(goBin)) {
+      env.PATH = `${goBin}:/usr/local/go/bin:${currentPath}`;
+    }
+    return env;
+  }
+
+  private isIncoFile(doc: vscode.TextDocument): boolean {
+    const name = doc.fileName;
+    if (path.basename(name).startsWith(".inco-fmt-")) {
+      return false;
+    }
+    return name.endsWith(".inco.go") || name.endsWith(".inco");
   }
 }

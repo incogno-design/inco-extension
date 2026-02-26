@@ -84,6 +84,18 @@
         "command": "inco.fmt",
         "title": "inco: Format (inco fmt)",
         "icon": "$(symbol-ruler)"
+      },
+      {
+        "command": "inco.watchStart",
+        "title": "inco: Start Watch"
+      },
+      {
+        "command": "inco.watchStop",
+        "title": "inco: Stop Watch"
+      },
+      {
+        "command": "inco.watchRestart",
+        "title": "inco: Restart Watch"
       }
     ],
     "menus": {
@@ -110,10 +122,10 @@
           "default": "inco",
           "description": "Path to the inco binary. Defaults to 'inco' (found via PATH)."
         },
-        "inco.autoGen": {
+        "inco.watch.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically run 'inco gen' on save in .inco.go files."
+          "description": "Automatically start 'inco watch' on activation for incremental overlay generation. Replaces the old auto-gen-on-save approach."
         },
         "inco.diagnostics.enabled": {
           "type": "boolean",

@@ -54,7 +54,6 @@ function runIncoCommand(
       ".";
     const proc = cp.spawn(bin, args, {
       cwd,
-      shell: true,
       env: augmentedEnv(),
     });
 
@@ -96,7 +95,6 @@ export function runIncoCommandCapture(args: string[]): Promise<string> {
       ".";
     const proc = cp.spawn(bin, args, {
       cwd,
-      shell: true,
       env: augmentedEnv(),
     });
 
@@ -146,12 +144,13 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Outpu
       vscode.commands.registerCommand(cmd.id, async () => {
         channel.appendLine(`\n--- ${cmd.label} ---`);
         try {
-          const code = await runIncoCommand(channel, cmd.args);
+          // Pause watch while running CLI commands to avoid file lock
+          // conflicts and fsnotify noise.
+          const code = await withWatchPaused(() =>
+            runIncoCommand(channel, cmd.args)
+          );
           if (code === 0) {
             vscode.window.showInformationMessage(`inco: ${cmd.label} succeeded.`);
-            if (cmd.id === "inco.gen") {
-              await postGenSync(true); // manual — immediate
-            }
           } else {
             vscode.window.showWarningMessage(
               `inco: ${cmd.label} exited with code ${code}.`
@@ -172,7 +171,9 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Outpu
     vscode.commands.registerCommand("inco.fmt", async () => {
       channel.appendLine(`\n--- Formatting ---`);
       try {
-        await runIncoCommand(channel, ["fmt", "./..."], { silent: true });
+        await withWatchPaused(() =>
+          runIncoCommand(channel, ["fmt", "./..."], { silent: true })
+        );
       } catch (e) {
         log(`[inco] fmt error: ${e}`);
       }
@@ -181,7 +182,7 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Outpu
 
   // inco.audit — handled by IncoAuditPanel (registered in extension.ts)
 
-  // Expose a silent gen runner for auto-gen (no panel popup, no toast)
+  // Expose channel reference for watch process
   incoChannel = channel;
 
   // Manual build-check command for debugging
@@ -196,6 +197,29 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Outpu
       } catch (e) {
         log(`[inco] checkBuild error: ${e}`);
       }
+    })
+  );
+
+  // Watch start / stop / restart commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand("inco.watchStart", () => {
+      _intentionallyStopped = false;
+      startWatch(channel);
+      vscode.window.showInformationMessage("inco: watch started.");
+    })
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("inco.watchStop", () => {
+      stopWatch();
+      vscode.window.showInformationMessage("inco: watch stopped.");
+    })
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("inco.watchRestart", () => {
+      stopWatch();
+      _intentionallyStopped = false;
+      startWatch(channel);
+      vscode.window.showInformationMessage("inco: watch restarted.");
     })
   );
 
@@ -223,78 +247,119 @@ function log(msg: string): void {
   incoChannel?.appendLine(msg);
 }
 
+// ---------------------------------------------------------------------------
+// Watch process management
+// ---------------------------------------------------------------------------
+
+let watchProcess: cp.ChildProcess | undefined;
+let _intentionallyStopped = false;
+
 /**
- * Runs `inco gen` silently — output goes to the channel but
- * the panel won't pop up. Used by auto-gen on save/idle.
+ * Starts `inco watch .` as a persistent background child process.
+ * It handles fsnotify events, debouncing (100ms), incremental gen,
+ * and overlay/manifest writes (ScheduleFlush 200ms) automatically.
  *
- * Post-gen pipeline:
- *   1. syncGoplsOverlay — push `-overlay` flag into gopls settings so
- *      it uses the shadow files for completions / hover / diagnostics.
- *   2. checkBuildErrors — run `go build -overlay` ourselves and map
- *      errors back to the source. Acts as a fallback for compile errors
- *      that gopls might miss (or if gopls isn't installed).
+ * This replaces the old auto-gen-on-save approach.
  */
-export async function runGenSilent(): Promise<void> {
-  log("[inco] runGenSilent called");
-  if (!incoChannel) {
-    log("[inco] runGenSilent: no channel, aborting");
+export function startWatch(channel: vscode.OutputChannel): void {
+  if (watchProcess) {
+    log("[inco] watch process already running");
     return;
   }
-  try {
-    const code = await runIncoCommand(incoChannel, ["gen"], { silent: true });
-    log(`[inco] inco gen exit code: ${code}`);
-    if (code === 0) {
-      await postGenSync();
+
+  _intentionallyStopped = false;
+  incoChannel = channel;
+  const bin = getIncoPath();
+  const cwd =
+    findGoModDir(getWorkspaceDir() || ".") ||
+    getWorkspaceDir() ||
+    ".";
+
+  watchProcess = cp.spawn(bin, ["watch", "."], {
+    cwd,
+    env: augmentedEnv(),
+    // Use detached so we get a process group we can kill cleanly.
+    detached: true,
+  });
+
+  channel.appendLine(`[inco] watch process started (pid=${watchProcess.pid})`);
+
+  watchProcess.stderr?.on("data", (data: Buffer) => {
+    channel.append(data.toString());
+  });
+
+  watchProcess.stdout?.on("data", (data: Buffer) => {
+    channel.append(data.toString());
+  });
+
+  watchProcess.on("close", (code) => {
+    channel.appendLine(`[inco] watch process exited (code ${code})`);
+    watchProcess = undefined;
+
+    // Auto-restart on abnormal exit, but NOT if we stopped it intentionally
+    // (user command, withWatchPaused, or explicit stopWatch).
+    if (!_intentionallyStopped && code !== 0 && code !== null) {
+      channel.appendLine(`[inco] watch crashed — auto-restarting in 3s...`);
+      setTimeout(() => {
+        if (!watchProcess && !_intentionallyStopped) {
+          startWatch(channel);
+        }
+      }, 3000);
     }
-  } catch (e) {
-    log(`[inco] runGenSilent error: ${e}`);
+  });
+
+  watchProcess.on("error", (err) => {
+    channel.appendLine(`[inco] watch process error: ${err.message}`);
+    watchProcess = undefined;
+  });
+}
+
+/**
+ * Stops the background `inco watch` process.
+ * Uses negative PID to kill the entire process group (detached).
+ */
+export function stopWatch(): void {
+  _intentionallyStopped = true;
+  if (watchProcess && watchProcess.pid) {
+    log("[inco] stopping watch process");
+    try {
+      // Kill the entire process group so no orphan children remain.
+      process.kill(-watchProcess.pid, "SIGTERM");
+    } catch {
+      // Process may already be dead.
+      watchProcess.kill();
+    }
+    watchProcess = undefined;
   }
 }
 
 /**
- * Shared post-gen pipeline used by both the manual `inco.gen` command
- * and the silent auto-gen.
- *
- * When `immediate` is true (manual command), runs synchronously.
- * When false (auto-gen on save), debounces with a 1.5s delay so that
- * rapid successive saves don't thrash gopls with config reloads.
+ * Returns true if the watch process is currently running.
  */
-let postGenTimer: ReturnType<typeof setTimeout> | undefined;
-const POST_GEN_DEBOUNCE_MS = 1500;
-
-async function postGenSync(immediate = false): Promise<void> {
-  if (immediate) {
-    // Manual command — run now, cancel any pending debounce
-    if (postGenTimer) {
-      clearTimeout(postGenTimer);
-      postGenTimer = undefined;
-    }
-    await doPostGenSync();
-    return;
-  }
-
-  // Auto-gen — debounce so gopls isn't thrashed
-  if (postGenTimer) {
-    clearTimeout(postGenTimer);
-  }
-  postGenTimer = setTimeout(() => {
-    postGenTimer = undefined;
-    doPostGenSync().catch((e) => {
-      log(`[inco] debounced postGenSync error: ${e}`);
-    });
-  }, POST_GEN_DEBOUNCE_MS);
+export function isWatchRunning(): boolean {
+  return watchProcess !== undefined;
 }
 
-async function doPostGenSync(): Promise<void> {
-  // 1) gopls overlay — main provider (real-time / incremental)
-  //    Wrapped in try/catch so a gopls error never blocks build-check.
-  try {
-    await syncGoplsOverlay();
-  } catch (e) {
-    log(`[inco] syncGoplsOverlay error (non-fatal): ${e}`);
+/**
+ * Pauses the watch process (if running), executes `fn`, then restarts
+ * watch. Used by CLI commands (gen, clean, build, etc.) that conflict
+ * with a running watch process due to file locks / fsnotify.
+ */
+export async function withWatchPaused<T>(fn: () => Promise<T>): Promise<T> {
+  const wasRunning = isWatchRunning();
+  if (wasRunning) {
+    stopWatch();
+    // Give the process group time to fully exit and release file handles.
+    await new Promise((r) => setTimeout(r, 300));
   }
-  // 2) go build -overlay — fallback provider (compile-error catch-all)
-  await checkBuildErrors();
+  try {
+    return await fn();
+  } finally {
+    if (wasRunning && incoChannel) {
+      _intentionallyStopped = false;
+      startWatch(incoChannel);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -302,74 +367,100 @@ async function doPostGenSync(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Updates the gopls workspace configuration to include
- * `-overlay=<abs>/.inco_cache/overlay.json` in `build.buildFlags`.
+ * Configures gopls to coexist safely with inco's shadow files:
  *
- * This tells gopls to use the shadow files for analysis, which gives
- * you completions, hover, and (sometimes) diagnostics that account for
- * the injected guard blocks.
+ * Sets directoryFilters to exclude .inco_cache so gopls does NOT
+ * watch or index the shadow .go files — preventing resource contention
+ * and duplicate analysis with inco watch.
  *
- * If the overlay file doesn't exist (e.g. after `inco clean`),
- * the flag is removed so gopls falls back to the original sources.
+ * We intentionally do NOT set -overlay in gopls buildFlags. Doing so
+ * would make gopls replace .inco.go content with shadow files internally,
+ * causing file-ownership contention with inco watch (the freeze/卡死
+ * root cause). Instead, build-error diagnostics from shadow files are
+ * handled separately by checkBuildErrors() which runs its own
+ * `go build -overlay=...` and maps errors back to .inco.go via //line
+ * directives.
+ *
+ * gopls continues to analyze the original .inco.go source files
+ * directly — this gives correct Go syntax/type checking for the
+ * non-guard portions of the code.
  */
-async function syncGoplsOverlay(): Promise<void> {
+let _goplsSynced = false;
+
+export async function syncGoplsOverlay(): Promise<void> {
+  // Only need to run once — directoryFilters is a static setting.
+  if (_goplsSynced) {
+    return;
+  }
+
   const wsDir = getWorkspaceDir();
   if (!wsDir) {
     return;
   }
 
-  // .inco_cache lives next to go.mod, not necessarily at workspace root
-  const goModDir = findGoModDir(wsDir);
-  if (!goModDir) {
-    return;
-  }
-
-  const overlayPath = path.join(goModDir, ".inco_cache", "overlay.json");
-  const overlayExists = fs.existsSync(overlayPath);
-
   const gopls = vscode.workspace.getConfiguration("gopls");
 
   // Check if gopls configuration section is available at all.
-  // In some environments (devcontainers, remote), the Go extension
-  // may not be installed or may not expose this config key.
   const inspection = gopls.inspect<string[]>("build.buildFlags");
   if (!inspection) {
-    log("[inco] gopls.build.buildFlags not available in this environment, skipping overlay sync");
+    log("[inco] gopls config not available, skipping sync");
     return;
   }
 
-  const current: string[] = gopls.get<string[]>("build.buildFlags") || [];
+  // ── 1. Remove any stale -overlay flag from previous versions ──
+  const currentFlags: string[] = gopls.get<string[]>("build.buildFlags") || [];
+  const filteredFlags = currentFlags.filter((f) => !f.startsWith("-overlay="));
+  const flagsChanged = filteredFlags.length !== currentFlags.length;
 
-  // Strip any existing -overlay flag
-  const filtered = current.filter((f) => !f.startsWith("-overlay="));
+  // ── 2. directoryFilters: exclude .inco_cache ────────────────
+  // Prevents gopls from watching/indexing shadow .go files, which
+  // would cause duplicate analysis and file contention with inco watch.
+  const cacheFilter = "-**/.inco_cache";
+  const currentFilters: string[] = gopls.get<string[]>("directoryFilters") || [];
+  const filtersNeedUpdate = !currentFilters.includes(cacheFilter);
 
-  // Add the current overlay flag only if the file exists
-  if (overlayExists) {
-    filtered.push(`-overlay=${overlayPath}`);
-  }
-
-  // Only write if something changed
-  const changed =
-    filtered.length !== current.length ||
-    filtered.some((f, i) => f !== current[i]);
-
-  if (changed) {
-    try {
+  // ── Apply changes ───────────────────────────────────────────
+  try {
+    if (flagsChanged) {
       await gopls.update(
         "build.buildFlags",
-        filtered,
+        filteredFlags.length > 0 ? filteredFlags : undefined,
         vscode.ConfigurationTarget.Workspace
       );
-    } catch (e) {
-      // Silently skip if the config section isn't registered
-      log(`[inco] gopls.build.buildFlags update skipped: ${e}`);
+      log(`[inco] removed stale -overlay from gopls buildFlags`);
     }
+
+    if (filtersNeedUpdate) {
+      const newFilters = [...currentFilters, cacheFilter];
+      await gopls.update(
+        "directoryFilters",
+        newFilters,
+        vscode.ConfigurationTarget.Workspace
+      );
+      log(`[inco] gopls directoryFilters updated: ${JSON.stringify(newFilters)}`);
+    }
+  } catch (e) {
+    log(`[inco] gopls config update skipped: ${e}`);
   }
+
+  _goplsSynced = true;
 }
 
 // ---------------------------------------------------------------------------
 // Build-error diagnostics  (fallback — `go build -overlay`)
 // ---------------------------------------------------------------------------
+
+/**
+ * Exported wrapper for checkBuildErrors — runs silently without
+ * showing the output channel. Used by the overlay watcher.
+ */
+export async function runBuildCheck(): Promise<void> {
+  try {
+    await checkBuildErrors();
+  } catch (e) {
+    log(`[inco] buildCheck error: ${e}`);
+  }
+}
 
 /**
  * After `inco gen`, runs `go build -overlay=... ./...` silently.
@@ -466,7 +557,7 @@ function runGoCheck(cwd: string, overlayPath: string): Promise<string> {
     const proc = cp.spawn(
       "go",
       ["build", `-overlay=${overlayPath}`, "-gcflags=-e", "./..."],
-      { cwd, shell: true, env: augmentedEnv() }
+      { cwd, env: augmentedEnv() }
     );
 
     let output = "";

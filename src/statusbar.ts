@@ -97,7 +97,7 @@ function refreshCoverage() {
   const config = vscode.workspace.getConfiguration("inco");
   const bin = getIncoExecutablePath();
 
-  const proc = cp.spawn(bin, ["audit", "."], { cwd, shell: true });
+  const proc = cp.spawn(bin, ["audit", "."], { cwd });
   let stdout = "";
 
   proc.stdout?.on("data", (data: Buffer) => {
