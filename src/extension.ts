@@ -108,7 +108,8 @@ export function activate(context: vscode.ExtensionContext) {
   // This is the ONLY mechanism that connects shadow-file errors to
   // .inco.go red lines — gopls never sees the shadow content.
   //
-  // Debounced (1s) to avoid hammering go build on rapid edits.
+  // Debounced (300ms) to coalesce near-simultaneous overlay writes.
+  // overlay.json updates only after gen completes, so no need for a long delay.
   const wsDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (wsDir) {
     const goModDir = findGoModDir(wsDir);
@@ -125,7 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
         buildCheckTimer = setTimeout(() => {
           buildCheckTimer = undefined;
           runBuildCheck();
-        }, 1000);
+        }, 300);
       };
 
       overlayWatcher.onDidCreate(() => {
