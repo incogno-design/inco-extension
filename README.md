@@ -1,6 +1,6 @@
 # inco — VS Code Extension
 
-The official VS Code extension for [inco](https://github.com/imnive-design/inco) — a compile-time assertion and contract engine for Go.
+The official VS Code extension for [inco](https://github.com/incogno-design/inco) — a compile-time assertion and contract engine for Go.
 
 Write declarative contracts in your Go code using `@inco:` directives. The extension provides real-time feedback, code generation, and tooling integration.
 
@@ -88,7 +88,7 @@ The extension automatically generates guard code in an overlay file, keeping you
 
 - **inco CLI**: Install with:
   ```bash
-  go install github.com/imnive-design/inco-go/cmd/inco@latest
+  go install github.com/incogno-design/inco/cmd/inco@latest
   ```
 - **Go**: A standard Go development environment.
 

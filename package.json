@@ -1,13 +1,13 @@
 {
-  "name": "inco",
-  "displayName": "inco — incognito assertions for Go",
-  "description": "VSCode extension for Inco, a compile-time assertion engine for Go. Provides syntax highlighting, diagnostics, commands, and snippets for @inco: directives.",
-  "version": "0.1.1",
-  "publisher": "imnive-design",
+  "name": "incogno",
+  "displayName": "inco - incognito assertions for Go",
+  "description": "VSCode extension for inco, a compile-time assertion engine for Go. Provides syntax highlighting, diagnostics, commands, and snippets for @inco: directives.",
+  "version": "0.1.2",
+  "publisher": "incogno-design",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/imnive-design/inco"
+    "url": "https://github.com/incogno-design/inco-extension"
   },
   "engines": {
     "vscode": "^1.100.0"
@@ -25,7 +25,7 @@
     "assertions",
     "compile-time"
   ],
-  "icon": "images/icon.png",
+  "icon": "images/icon.jpg",
   "activationEvents": [
     "onLanguage:go",
     "workspaceContains:**/*.inco.go"
