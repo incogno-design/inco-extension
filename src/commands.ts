@@ -551,12 +551,15 @@ export function findGoModDir(dir: string): string | undefined {
 /**
  * Runs `go build -overlay=<overlay> ./...` and captures combined output.
  * Uses `-gcflags=-e` to report all errors (not just first 10).
+ * Uses `-o /dev/null` to discard the binary — without it, Go writes an
+ * executable into the project directory when `./...` resolves to a single
+ * main package.
  */
 function runGoCheck(cwd: string, overlayPath: string): Promise<string> {
   return new Promise((resolve) => {
     const proc = cp.spawn(
       "go",
-      ["build", `-overlay=${overlayPath}`, "-gcflags=-e", "./..."],
+      ["build", `-overlay=${overlayPath}`, "-gcflags=-e", "-o", "/dev/null", "./..."],
       { cwd, env: augmentedEnv() }
     );
 
