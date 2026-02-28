@@ -107,10 +107,8 @@ export async function toggleFoldDirectives(): Promise<void> {
  */
 function collectHideTargets(doc: vscode.TextDocument): {
   decorations: vscode.DecorationOptions[];
-  foldLines: number[];
 } {
   const decorations: vscode.DecorationOptions[] = [];
-  const foldLines: number[] = [];
   let i = 0;
 
   while (i < doc.lineCount) {
@@ -118,22 +116,15 @@ function collectHideTargets(doc: vscode.TextDocument): {
 
     // ── Standalone directive block ──
     if (DIRECTIVE_LINE_RE.test(lineText)) {
-      const blockStart = i;
-
-      // Collect consecutive standalone directive lines
+      // Consecutive standalone directive lines
       while (i < doc.lineCount && DIRECTIVE_LINE_RE.test(doc.lineAt(i).text)) {
         decorations.push({ range: doc.lineAt(i).range });
         i++;
       }
-
-      // Collect trailing blank lines
+      // Trailing blank lines
       while (i < doc.lineCount && doc.lineAt(i).text.trim() === "") {
         decorations.push({ range: doc.lineAt(i).range });
         i++;
-      }
-
-      if (i - 1 > blockStart) {
-        foldLines.push(blockStart);
       }
       continue;
     }
@@ -146,54 +137,17 @@ function collectHideTargets(doc: vscode.TextDocument): {
     i++;
   }
 
-  return { decorations, foldLines };
+  return { decorations };
 }
 
 async function hideDirectives(editor: vscode.TextEditor) {
-  const { decorations, foldLines } = collectHideTargets(editor.document);
-
+  const { decorations } = collectHideTargets(editor.document);
   editor.setDecorations(hiddenType, decorations);
-
-  if (foldLines.length > 0) {
-    await vscode.commands.executeCommand("editor.fold", {
-      selectionLines: foldLines,
-    });
-  }
 }
 
 async function showDirectives(editor: vscode.TextEditor) {
   // Remove invisible decoration
   editor.setDecorations(hiddenType, []);
-
-  // Unfold multi-line blocks
-  const doc = editor.document;
-  const foldLines: number[] = [];
-  let i = 0;
-
-  while (i < doc.lineCount) {
-    if (!DIRECTIVE_LINE_RE.test(doc.lineAt(i).text)) {
-      i++;
-      continue;
-    }
-
-    const start = i;
-    i++;
-    while (i < doc.lineCount && DIRECTIVE_LINE_RE.test(doc.lineAt(i).text)) {
-      i++;
-    }
-    while (i < doc.lineCount && doc.lineAt(i).text.trim() === "") {
-      i++;
-    }
-    if (i - 1 > start) {
-      foldLines.push(start);
-    }
-  }
-
-  if (foldLines.length > 0) {
-    await vscode.commands.executeCommand("editor.unfold", {
-      selectionLines: foldLines,
-    });
-  }
 }
 
 /**
@@ -204,7 +158,6 @@ export async function reapplyHiddenDecorations(editor: vscode.TextEditor) {
   if (!globalHidden) {
     return;
   }
-
   await hideDirectives(editor);
 }
 
