@@ -10,6 +10,7 @@ import { activateStatusBar } from "./statusbar";
 import { IncoCompletionProvider } from "./completion";
 import { IncoAuditPanel } from "./auditPanel";
 import { IncoFormattingProvider } from "./formatter";
+import { IncoFoldingProvider, toggleFoldDirectives, clearFoldStateOnClose, reapplyHiddenDecorations } from "./folding";
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("[inco] ★ Extension activated");
@@ -64,6 +65,32 @@ export function activate(context: vscode.ExtensionContext) {
       "-", // Trigger characters: dash
       ","  // Trigger characters: comma
     )
+  );
+
+  // Folding — hide/show @inco: / @if: directive blocks
+  context.subscriptions.push(
+    vscode.languages.registerFoldingRangeProvider(hoverSelector, new IncoFoldingProvider())
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("inco.toggleFoldDirectives", toggleFoldDirectives)
+  );
+  context.subscriptions.push(
+    vscode.workspace.onDidCloseTextDocument((doc) => clearFoldStateOnClose(doc.uri))
+  );
+  // Re-apply invisible decorations when switching editors
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor) { reapplyHiddenDecorations(editor); }
+    })
+  );
+  // Re-apply decorations when document content changes while hidden
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((e) => {
+      const editor = vscode.window.activeTextEditor;
+      if (editor && e.document === editor.document) {
+        reapplyHiddenDecorations(editor);
+      }
+    })
   );
 
   // Formatter — gofmt + directive spacing normalization for .inco.go files

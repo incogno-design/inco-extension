@@ -3,9 +3,12 @@ import * as cp from "child_process";
 import { getIncoExecutablePath } from "./util";
 
 let statusBarItem: vscode.StatusBarItem;
-let highlightStatusItem: vscode.StatusBarItem;
 let fmtStatusItem: vscode.StatusBarItem;
+let foldStatusItem: vscode.StatusBarItem;
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Whether directives are currently folded (toggled by the button). */
+let directivesFolded = false;
 
 /**
  * Activates the Inco coverage status bar item.
@@ -20,14 +23,7 @@ export function activateStatusBar(context: vscode.ExtensionContext) {
   statusBarItem.tooltip = "inco contract coverage — click to run audit";
   context.subscriptions.push(statusBarItem);
 
-  highlightStatusItem = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Left,
-    49
-  );
-  highlightStatusItem.command = "inco.toggleHighlight";
-  context.subscriptions.push(highlightStatusItem);
-
-  // Fmt button — next to HL
+  // Fmt button
   fmtStatusItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Left,
     48
@@ -38,9 +34,18 @@ export function activateStatusBar(context: vscode.ExtensionContext) {
   context.subscriptions.push(fmtStatusItem);
   fmtStatusItem.show();
 
+  // Fold button — next to Fmt
+  foldStatusItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Left,
+    47
+  );
+  foldStatusItem.command = "inco.toggleFoldDirectives";
+  context.subscriptions.push(foldStatusItem);
+  updateFoldStatus();
+  foldStatusItem.show();
+
   // Initial refresh
   refreshCoverage();
-  updateHighlightStatus();
 
   // Refresh after saving .inco.go files
   context.subscriptions.push(
@@ -54,28 +59,32 @@ export function activateStatusBar(context: vscode.ExtensionContext) {
   // Listen for config changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("inco.highlight.enabled")) {
-        updateHighlightStatus();
+      if (e.affectsConfiguration("inco")) {
+        // reserved for future config listeners
       }
     })
   );
 }
 
-function updateHighlightStatus() {
-  const enabled = vscode.workspace
-    .getConfiguration("inco")
-    .get<boolean>("highlight.enabled", true);
-
-  if (enabled) {
-    highlightStatusItem.text = "$(eye) inco HL";
-    highlightStatusItem.tooltip = "inco Highlighting: ON (click to disable)";
-    highlightStatusItem.color = undefined; // Default color
+function updateFoldStatus() {
+  if (directivesFolded) {
+    foldStatusItem.text = "$(eye-closed) inco Fold";
+    foldStatusItem.tooltip = "Directives hidden — click to show";
+    foldStatusItem.color = new vscode.ThemeColor("terminal.ansiBrightBlack");
   } else {
-    highlightStatusItem.text = "$(eye-closed) inco HL";
-    highlightStatusItem.tooltip = "inco Highlighting: OFF (click to enable)";
-    highlightStatusItem.color = new vscode.ThemeColor("terminal.ansiBrightBlack"); // Dimmed
+    foldStatusItem.text = "$(eye) inco Fold";
+    foldStatusItem.tooltip = "Directives visible — click to hide";
+    foldStatusItem.color = undefined;
   }
-  highlightStatusItem.show();
+}
+
+/**
+ * Notify the status bar that fold state changed (called from folding.ts
+ * after the toggle command executes).
+ */
+export function notifyFoldToggled(folded: boolean) {
+  directivesFolded = folded;
+  updateFoldStatus();
 }
 
 function scheduleRefresh() {

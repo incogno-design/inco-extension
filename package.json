@@ -96,6 +96,11 @@
       {
         "command": "inco.watchRestart",
         "title": "inco: Restart Watch"
+      },
+      {
+        "command": "inco.toggleFoldDirectives",
+        "title": "inco: Toggle Fold Directives",
+        "icon": "$(fold)"
       }
     ],
     "menus": {
