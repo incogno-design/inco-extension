@@ -2,7 +2,7 @@
   "name": "incogno",
   "displayName": "inco - incognito assertions for Go",
   "description": "VSCode extension for inco, a compile-time assertion engine for Go. Provides syntax highlighting, diagnostics, commands, and snippets for @inco: directives.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "incogno-design",
   "license": "MIT",
   "repository": {
@@ -75,10 +75,6 @@
         "command": "inco.preview",
         "title": "inco: Preview Generated Guard",
         "icon": "$(open-preview)"
-      },
-      {
-        "command": "inco.toggleHighlight",
-        "title": "inco: Toggle Highlight"
       },
       {
         "command": "inco.fmt",
