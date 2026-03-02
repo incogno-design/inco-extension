@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
 import * as path from "path";
+import { augmentedEnv } from "./util";
 
 /**
  * DocumentFormattingProvider for .inco.go files.
@@ -178,13 +179,4 @@ function formatDirectiveSpacing(src: string): string {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function augmentedEnv(): NodeJS.ProcessEnv {
-  const env = { ...process.env };
-  const goPath = env.GOPATH || path.join(env.HOME || "", "go");
-  const goBin = path.join(goPath, "bin");
-  const currentPath = env.PATH || "/usr/bin:/bin:/usr/sbin:/sbin";
-  if (!currentPath.includes(goBin)) {
-    env.PATH = `${goBin}:/usr/local/go/bin:${currentPath}`;
-  }
-  return env;
-}
+// augmentedEnv is now imported from ./util

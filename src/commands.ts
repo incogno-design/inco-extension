@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as cp from "child_process";
 import * as path from "path";
 import * as fs from "fs";
-import { getIncoExecutablePath } from "./util";
+import { getIncoExecutablePath, augmentedEnv } from "./util";
 
 /**
  * Returns the configured inco executable path.
@@ -11,21 +11,7 @@ function getIncoPath(): string {
   return getIncoExecutablePath();
 }
 
-/**
- * Returns a copy of process.env with go/inco bin dirs on PATH.
- * Handles the case where PATH is undefined in the extension host.
- */
-function augmentedEnv(): NodeJS.ProcessEnv {
-  const env = { ...process.env };
-  const goPath = env.GOPATH || path.join(env.HOME || "", "go");
-  const goBin = path.join(goPath, "bin");
-  const localBin = "/usr/local/go/bin";
-  const currentPath = env.PATH || "/usr/bin:/bin:/usr/sbin:/sbin";
-  if (!currentPath.includes(goBin)) {
-    env.PATH = `${goBin}:${localBin}:${currentPath}`;
-  }
-  return env;
-}
+// augmentedEnv is now imported from ./util
 
 /**
  * Returns the workspace root directory, or undefined.

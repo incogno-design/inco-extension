@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
 import * as path from "path";
-import { getIncoExecutablePath } from "./util";
+import { getIncoExecutablePath, augmentedEnv } from "./util";
 import { findGoModDir } from "./commands";
 
 /**
@@ -210,14 +210,7 @@ export class IncoDirectiveDiagnostics {
   }
 
   private augmentedEnv(): NodeJS.ProcessEnv {
-    const env = { ...process.env };
-    const goPath = env.GOPATH || path.join(env.HOME || "", "go");
-    const goBin = path.join(goPath, "bin");
-    const currentPath = env.PATH || "/usr/bin:/bin:/usr/sbin:/sbin";
-    if (!currentPath.includes(goBin)) {
-      env.PATH = `${goBin}:/usr/local/go/bin:${currentPath}`;
-    }
-    return env;
+    return augmentedEnv();
   }
 
   private isIncoFile(doc: vscode.TextDocument): boolean {

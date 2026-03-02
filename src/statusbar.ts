@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as cp from "child_process";
-import { getIncoExecutablePath } from "./util";
+import { getIncoExecutablePath, augmentedEnv } from "./util";
 
 let statusBarItem: vscode.StatusBarItem;
 let fmtStatusItem: vscode.StatusBarItem;
@@ -106,7 +106,7 @@ function refreshCoverage() {
   const config = vscode.workspace.getConfiguration("inco");
   const bin = getIncoExecutablePath();
 
-  const proc = cp.spawn(bin, ["audit", "."], { cwd });
+  const proc = cp.spawn(bin, ["audit", "."], { cwd, env: augmentedEnv() });
   let stdout = "";
 
   proc.stdout?.on("data", (data: Buffer) => {
